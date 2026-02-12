@@ -53,10 +53,7 @@ class TwoWeekRenderer(BaseRenderer):
         week2_start = week1_start + timedelta(days=7)
         self._draw_week_row(draw, week2_start, y + row_height, row_height, col_width, events_by_day)
 
-        # Draw legend in footer
-        footer_y = header_height + available_height
-        legend_data = self.color_manager.get_legend()
-        self.draw_legend(draw, footer_y + 5, legend_data)
+        # Legend removed - calendar colors are self-explanatory
 
         self.logger.info("Rendered two-week grid view")
         return image
