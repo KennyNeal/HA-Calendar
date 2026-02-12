@@ -33,12 +33,12 @@ class MonthRenderer(BaseRenderer):
         image, draw = self.create_canvas()
 
         # Draw header with weather
-        header_height = 80
+        header_height = 50
         y = self.draw_header(draw, weather_info, header_height)
 
         # Calculate grid dimensions
         # Layout: Up to 6 rows (weeks) x 7 columns (days)
-        footer_height = 40
+        footer_height = 0  # No footer needed
         available_height = self.height - header_height - footer_height
         row_height = available_height // 6
         col_width = self.width // 7

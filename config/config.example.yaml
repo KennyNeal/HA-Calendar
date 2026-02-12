@@ -51,6 +51,9 @@ views:
   two_week:
     show_time: true
     max_events_per_day: 3
+  four_day:
+    show_time: true
+    max_events_per_day: 10
   week:
     show_time: true
     max_events_per_day: 5

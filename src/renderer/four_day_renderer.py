@@ -1,26 +1,26 @@
-"""Week calendar renderer."""
+"""Four-day calendar renderer showing today plus next 3 days."""
 
 from datetime import datetime, date, timedelta
 from renderer.base_renderer import BaseRenderer
 
 
-class WeekRenderer(BaseRenderer):
-    """Renders a single week calendar view with larger cells."""
+class FourDayRenderer(BaseRenderer):
+    """Renders a 4-day view with detailed event listings."""
 
     def __init__(self, config, color_manager):
         """
-        Initialize week renderer.
+        Initialize four-day renderer.
 
         Args:
             config: Configuration dictionary
             color_manager: ColorManager instance
         """
         super().__init__(config, color_manager)
-        self.view_config = config['views']['week']
+        self.view_config = config['views']['four_day']
 
     def render(self, events_by_day, weather_info):
         """
-        Render single week view.
+        Render 4-day view.
 
         Args:
             events_by_day: Dictionary mapping date to DayEvents
@@ -35,96 +35,82 @@ class WeekRenderer(BaseRenderer):
         header_height = 50
         y = self.draw_header(draw, weather_info, header_height)
 
-        # Calculate grid dimensions
-        # Layout: 1 row (week) x 7 columns (days) with larger cells
+        # Calculate column dimensions
+        # Layout: 4 columns (4 days)
         footer_height = 0  # No footer needed
         available_height = self.height - header_height - footer_height
-        row_height = available_height
-        col_width = self.width // 7
+        col_width = self.width // 4
 
-        # Get current week (Monday to Sunday)
-        today = date.today()
-        week_start = today - timedelta(days=today.weekday())  # Monday of current week
-
-        # Draw week row
-        self._draw_week_row(draw, week_start, y, row_height, col_width, events_by_day)
-
-        # Legend removed - calendar colors are self-explanatory
-
-        self.logger.info("Rendered week calendar view")
-        return image
-
-    def _draw_week_row(self, draw, week_start, y, row_height, col_width, events_by_day):
-        """
-        Draw the week row.
-
-        Args:
-            draw: ImageDraw object
-            week_start: Date of Monday for this week
-            y: Y coordinate for this row
-            row_height: Height of the row
-            col_width: Width of each column
-            events_by_day: Dictionary mapping date to DayEvents
-        """
-        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        # Get today's date
         today = date.today()
 
-        for i in range(7):
-            current_date = week_start + timedelta(days=i)
+        # Draw 4 days starting from today
+        for i in range(4):
+            current_date = today + timedelta(days=i)
             x = i * col_width
-            is_today = (current_date == today)
+            is_today = (i == 0)
 
-            # Draw cell
-            self._draw_day_cell(
+            self._draw_day_column(
                 draw,
                 x,
                 y,
                 col_width,
-                row_height,
+                available_height,
                 current_date,
-                day_names[i],
                 events_by_day.get(current_date),
                 is_today
             )
 
-    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_name, day_events, is_today):
+        self.logger.info("Rendered 4-day view")
+        return image
+
+    def _draw_day_column(self, draw, x, y, width, height, date_obj, day_events, is_today):
         """
-        Draw a single day cell for week view.
+        Draw a single day column.
 
         Args:
             draw: ImageDraw object
             x: X coordinate
             y: Y coordinate
-            width: Cell width
-            height: Cell height
-            date_obj: Date object for this cell
-            day_name: Full day name (e.g., 'Monday')
+            width: Column width
+            height: Column height
+            date_obj: Date object for this column
             day_events: DayEvents object or None
             is_today: Boolean indicating if this is today
         """
-        # Draw cell border (thicker if today)
-        border_width = 3 if is_today else 1
+        # Draw column border
+        border_width = 1
         self.draw_box(draw, x, y, width, height, outline=self.black, outline_width=border_width)
 
+        # Note: No highlight for today since it's always the first column
+
         # Draw day name and date
-        padding = 8
-        date_header = f"{day_name[:3]} {date_obj.day}"
-        self.draw_text(draw, date_header, x + padding, y + padding, self.fonts['large'], self.black)
+        day_name = date_obj.strftime("%A")
+        date_str = date_obj.strftime("%b %d")
+
+        padding = 5
+        text_x = x + padding
+
+        # Day name (larger)
+        self.draw_text(draw, day_name, text_x, y + padding, self.fonts['large'], self.black)
+
+        # Date (smaller, below day name)
+        self.draw_text(draw, date_str, text_x, y + padding + 25, self.fonts['medium'], self.black)
 
         # Draw events if any
         if day_events and day_events.events:
-            self._draw_events_in_cell(
+            self._draw_events_in_column(
                 draw,
-                x + padding,
-                y + 40,  # Start below the date header
+                text_x,
+                y + 60,  # Start below the date
                 width - (2 * padding),
-                height - 45,
+                height - 65,
                 day_events
             )
 
-    def _draw_events_in_cell(self, draw, x, y, width, height, day_events):
+    def _draw_events_in_column(self, draw, x, y, width, height, day_events):
         """
-        Draw events within a cell with time-based vertical positioning.
+        Draw events within a column with time-based vertical positioning.
         Event heights are proportional to their duration.
 
         Args:
@@ -135,7 +121,7 @@ class WeekRenderer(BaseRenderer):
             height: Available height
             day_events: DayEvents object
         """
-        max_events = self.view_config.get('max_events_per_day', 5)
+        max_events = self.view_config.get('max_events_per_day', 10)
         show_time = self.view_config.get('show_time', True)
 
         events_to_show = day_events.events[:max_events]

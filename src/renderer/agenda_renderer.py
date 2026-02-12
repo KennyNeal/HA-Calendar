@@ -32,11 +32,11 @@ class AgendaRenderer(BaseRenderer):
         image, draw = self.create_canvas()
 
         # Draw header with weather
-        header_height = 80
+        header_height = 50
         y = self.draw_header(draw, weather_info, header_height)
 
         # Calculate available space
-        footer_height = 40
+        footer_height = 0  # No footer needed
         available_height = self.height - header_height - footer_height
         content_y = y + 10
 

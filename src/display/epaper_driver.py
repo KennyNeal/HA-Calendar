@@ -71,48 +71,37 @@ class EPaperDisplay:
 
     def quantize_image(self, image):
         """
-        Convert PIL Image to e-paper 6-color palette with dithering.
+        Convert PIL Image to e-paper 7-color palette.
+        Uses the official Waveshare palette order.
 
         Args:
             image: PIL Image object
 
         Returns:
-            PIL.Image: Quantized image with dithering
+            PIL.Image: Quantized palette image
         """
         # Convert to RGB if needed
         if image.mode != 'RGB':
             image = image.convert('RGB')
 
-        # Create a palette image with our 6 e-paper colors
-        # Palette needs to be 768 bytes (256 colors * 3 RGB values)
-        palette_img = Image.new('P', (1, 1))
+        # Create palette image matching official Waveshare driver
+        # Palette order: Black, White, Yellow, Red, Black(duplicate), Blue, Green
+        pal_image = Image.new("P", (1, 1))
+        pal_image.putpalette(
+            (0, 0, 0,           # 0: Black
+             255, 255, 255,     # 1: White
+             255, 255, 0,       # 2: Yellow
+             255, 0, 0,         # 3: Red
+             0, 0, 0,           # 4: Black (duplicate)
+             0, 0, 255,         # 5: Blue
+             0, 255, 0)         # 6: Green
+            + (0, 0, 0) * 249   # Fill remaining palette slots
+        )
 
-        # Build palette: first 6 colors are ours, rest are black
-        palette = []
-        epaper_colors = [
-            (0, 0, 0),      # Black
-            (255, 255, 255), # White
-            (0, 255, 0),    # Green
-            (0, 0, 255),    # Blue
-            (255, 0, 0),    # Red
-            (255, 255, 0),  # Yellow
-        ]
+        # Quantize to the 7-color palette (no dithering for solid colors)
+        quantized = image.convert("RGB").quantize(palette=pal_image, dither=Image.Dither.NONE)
 
-        for color in epaper_colors:
-            palette.extend(color)
-
-        # Fill remaining palette slots with black
-        for _ in range(256 - len(epaper_colors)):
-            palette.extend([0, 0, 0])
-
-        palette_img.putpalette(palette)
-
-        # Apply Floyd-Steinberg dithering while quantizing
-        # This creates the illusion of more colors
-        quantized = image.quantize(palette=palette_img, dither=Image.Dither.FLOYDSTEINBERG)
-
-        # Convert back to RGB for compatibility with buffer conversion
-        return quantized.convert('RGB')
+        return quantized
 
     def _find_nearest_color(self, rgb):
         """
@@ -159,8 +148,9 @@ class EPaperDisplay:
 
         if self.mock_mode:
             # Save to file instead of displaying on hardware
+            # Convert to RGB for saving as PNG
             output_path = 'calendar_display.png'
-            quantized_image.save(output_path)
+            quantized_image.convert('RGB').save(output_path)
             self.logger.info(f"Mock mode: Saved image to {output_path}")
         else:
             try:
@@ -176,61 +166,34 @@ class EPaperDisplay:
 
             except Exception as e:
                 self.logger.error(f"Failed to display image: {e}")
-                # Save as backup
-                quantized_image.save('calendar_display_error.png')
+                # Save as backup (convert to RGB for debugging)
+                quantized_image.convert('RGB').save('calendar_display_error.png')
                 self.logger.info("Saved error backup to calendar_display_error.png")
 
     def _image_to_buffer(self, image):
         """
-        Convert PIL Image to Waveshare buffer format.
+        Convert PIL palette Image to Waveshare buffer format.
+        Matches the official Waveshare implementation.
 
         Args:
-            image: PIL Image (already quantized)
+            image: PIL palette Image (already quantized)
 
         Returns:
             bytearray: Buffer for Waveshare display
         """
-        # This method converts the RGB image to the specific format
-        # required by the Waveshare 7.3" HAT (E)
-
         # The 7.3" HAT (E) uses 4 bits per pixel (2 pixels per byte)
-        # Buffer size is width * height / 2
+        # Get the palette indices directly
+        buf_indices = bytearray(image.tobytes('raw'))
+
+        # Pack 2 pixels (4-bit color indices) into each byte
         width, height = image.size
         buf = [0x00] * (width * height // 2)
 
-        pixels = image.load()
-
-        for y in range(height):
-            for x in range(width):
-                r, g, b = pixels[x, y]
-
-                # Map RGB to Waveshare color code
-                # These codes are specific to the 7.3" HAT (E)
-                if (r, g, b) == (0, 0, 0):
-                    color_code = 0x00  # Black
-                elif (r, g, b) == (255, 255, 255):
-                    color_code = 0x01  # White
-                elif (r, g, b) == (0, 255, 0):
-                    color_code = 0x02  # Green
-                elif (r, g, b) == (0, 0, 255):
-                    color_code = 0x03  # Blue
-                elif (r, g, b) == (255, 0, 0):
-                    color_code = 0x04  # Red
-                elif (r, g, b) == (255, 255, 0):
-                    color_code = 0x05  # Yellow
-                else:
-                    color_code = 0x00  # Default to black
-
-                # Pack 2 pixels per byte (4 bits each)
-                pixel_index = y * width + x
-                byte_index = pixel_index // 2
-
-                if pixel_index % 2 == 0:
-                    # First pixel in byte (high nibble)
-                    buf[byte_index] = (color_code << 4) & 0xF0
-                else:
-                    # Second pixel in byte (low nibble)
-                    buf[byte_index] |= color_code & 0x0F
+        idx = 0
+        for i in range(0, len(buf_indices), 2):
+            # Pack high nibble (first pixel) and low nibble (second pixel)
+            buf[idx] = (buf_indices[i] << 4) + buf_indices[i + 1]
+            idx += 1
 
         return bytes(buf)
 

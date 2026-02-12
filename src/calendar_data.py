@@ -87,6 +87,7 @@ class CalendarDataProcessor:
 
             # Get color for this calendar
             color_info = self.color_manager.get_calendar_color(calendar_id)
+            self.logger.info(f"Event '{event_data.get('summary')}' from {calendar_id}: color={color_info['name']} RGB{color_info['rgb']}")
 
             return CalendarEvent(
                 calendar_id=calendar_id,

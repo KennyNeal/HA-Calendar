@@ -87,13 +87,13 @@ class WeatherDataProcessor:
 
     def format_weather_text(self, weather_info):
         """
-        Format weather information as display text with icon.
+        Format weather information as display text.
 
         Args:
             weather_info: WeatherInfo object
 
         Returns:
-            str: Formatted weather text with icon
+            str: Formatted weather text
         """
         if not weather_info:
             return "Weather Unavailable"
@@ -101,12 +101,8 @@ class WeatherDataProcessor:
         # Format temperature with degree symbol
         temp_str = f"{weather_info.temperature:.0f}{weather_info.temperature_unit}"
 
-        # Get weather icon (use condition text as fallback)
-        condition_lower = weather_info.condition.lower().replace(' ', '-')
-        icon = self.WEATHER_ICONS.get(condition_lower, weather_info.condition)
-
-        # Combine icon and temperature
-        return f"{icon}  {temp_str}"
+        # Combine condition and temperature
+        return f"{weather_info.condition}, {temp_str}"
 
     def format_weather_detailed(self, weather_info):
         """

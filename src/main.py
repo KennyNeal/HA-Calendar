@@ -3,6 +3,7 @@
 import sys
 import os
 import yaml
+import fcntl
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -61,6 +62,13 @@ def select_renderer(view_name, config, color_manager):
     # Import renderers as needed
     if view_name == 'two_week':
         return TwoWeekRenderer(config, color_manager)
+    elif view_name == 'four_day':
+        try:
+            from renderer.four_day_renderer import FourDayRenderer
+            return FourDayRenderer(config, color_manager)
+        except ImportError:
+            logger.warning("FourDayRenderer not available, using TwoWeekRenderer")
+            return TwoWeekRenderer(config, color_manager)
     elif view_name == 'month':
         try:
             from renderer.month_renderer import MonthRenderer
@@ -104,7 +112,15 @@ def main():
         # Initialize components
         logger.info("Initializing components...")
         color_manager = ColorManager(config)
-        color_manager.assign_calendar_colors(config['calendars'])
+        assigned_colors = color_manager.assign_calendar_colors(config['calendars'])
+
+        # Debug: Log calendar color assignments
+        logger.info("Calendar color assignments from config:")
+        for calendar in config['calendars']:
+            logger.info(f"  {calendar['entity_id']}: color={calendar.get('color', 'auto')}")
+        logger.info("ColorManager assigned colors:")
+        for entity_id, color_info in assigned_colors.items():
+            logger.info(f"  {entity_id}: {color_info['name']} RGB{color_info['rgb']}")
 
         ha_client = HomeAssistantClient(config)
         calendar_processor = CalendarDataProcessor(color_manager)
@@ -233,4 +249,27 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # Use file locking to prevent concurrent display access
+    lock_file = '/tmp/ha-calendar.lock'
+    lock_fd = None
+
+    try:
+        # Try to acquire lock
+        lock_fd = open(lock_file, 'w')
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        # Lock acquired, run main
+        main()
+
+    except IOError:
+        # Could not acquire lock - another instance is running
+        print("Another calendar update is already running. Exiting.")
+        sys.exit(0)
+    finally:
+        # Release lock
+        if lock_fd:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                lock_fd.close()
+            except:
+                pass

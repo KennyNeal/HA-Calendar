@@ -32,12 +32,12 @@ class TwoWeekRenderer(BaseRenderer):
         image, draw = self.create_canvas()
 
         # Draw header with weather
-        header_height = 80
+        header_height = 50
         y = self.draw_header(draw, weather_info, header_height)
 
         # Calculate grid dimensions
         # Layout: 2 rows (weeks) x 7 columns (days)
-        footer_height = 40
+        footer_height = 0  # No footer needed
         available_height = self.height - header_height - footer_height
         row_height = available_height // 2
         col_width = self.width // 7
@@ -155,7 +155,7 @@ class TwoWeekRenderer(BaseRenderer):
         for event in events_to_show:
             # Format event text
             if show_time and not event.all_day:
-                time_str = event.start.strftime("%H:%M")
+                time_str = event.start.strftime("%I:%M %p")
                 event_text = f"{time_str} {event.title}"
             else:
                 event_text = event.title
@@ -173,7 +173,7 @@ class TwoWeekRenderer(BaseRenderer):
             # Draw colored bar as background for event
             self.draw_box(draw, x, current_y, width, bar_height, fill=event.color)
 
-            # Draw each line of text in black on colored background
+            # Draw each line of text in white on colored background
             text_y = current_y + 2
             for line in text_lines:
                 self.draw_text(
@@ -182,7 +182,7 @@ class TwoWeekRenderer(BaseRenderer):
                     x + 3,
                     text_y,
                     self.fonts['small'],
-                    self.black
+                    self.white
                 )
                 text_y += line_height
 
