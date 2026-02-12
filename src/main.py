@@ -61,6 +61,13 @@ def select_renderer(view_name, config, color_manager):
     # Import renderers as needed
     if view_name == 'two_week':
         return TwoWeekRenderer(config, color_manager)
+    elif view_name == 'four_day':
+        try:
+            from renderer.four_day_renderer import FourDayRenderer
+            return FourDayRenderer(config, color_manager)
+        except ImportError:
+            logger.warning("FourDayRenderer not available, using TwoWeekRenderer")
+            return TwoWeekRenderer(config, color_manager)
     elif view_name == 'month':
         try:
             from renderer.month_renderer import MonthRenderer

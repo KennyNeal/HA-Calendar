@@ -16,3 +16,17 @@ shell_command:
   refresh_calendar_display: "curl -X POST http://<PI-IP>:8765/refresh"
 
 # Replace <PI-IP> with your actual Raspberry Pi IP address
+
+# Update your input_select.calendar_view to include all available views:
+input_select:
+  calendar_view:
+    name: Calendar View
+    options:
+      - 2-week
+      - 4-day
+      - week
+      - month
+      - agenda
+    initial: 4-day
+    icon: mdi:calendar
+
