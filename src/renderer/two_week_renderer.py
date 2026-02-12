@@ -106,22 +106,29 @@ class TwoWeekRenderer(BaseRenderer):
             day_events: DayEvents object or None
             is_today: Boolean indicating if this is today
         """
-        # Draw cell border (thicker if today)
-        border_width = 3 if is_today else 1
+        # Draw cell border
+        border_width = 1
         self.draw_box(draw, x, y, width, height, outline=self.black, outline_width=border_width)
+
+        # Highlight today with a thick green left border
+        if is_today:
+            # Draw thick green left border
+            for i in range(8):
+                draw.line([(x + i, y), (x + i, y + height)], fill=self.green, width=1)
 
         # Draw day name and date number
         date_str = f"{day_name} {date_obj.day}"
         padding = 5
-        self.draw_text(draw, date_str, x + padding, y + padding, self.fonts['medium'], self.black)
+        text_x = x + padding + (8 if is_today else 0)  # Add padding if today (for green border)
+        self.draw_text(draw, date_str, text_x, y + padding, self.fonts['medium'], self.black)
 
         # Draw events if any
         if day_events and day_events.events:
             self._draw_events_in_cell(
                 draw,
-                x + padding,
+                text_x,
                 y + 30,  # Start below the date
-                width - (2 * padding),
+                width - padding - (8 if is_today else 0) - padding,
                 height - 35,
                 day_events
             )
@@ -142,13 +149,10 @@ class TwoWeekRenderer(BaseRenderer):
         show_time = self.view_config.get('show_time', True)
 
         events_to_show = day_events.events[:max_events]
-        event_height = 18  # Height per event line
         current_y = y
+        line_height = 14  # Height per line of text
 
         for event in events_to_show:
-            if current_y + event_height > y + height:
-                break  # No more space
-
             # Format event text
             if show_time and not event.all_day:
                 time_str = event.start.strftime("%H:%M")
@@ -156,29 +160,37 @@ class TwoWeekRenderer(BaseRenderer):
             else:
                 event_text = event.title
 
-            # Draw colored dot/indicator
-            dot_size = 6
-            dot_x = x
-            dot_y = current_y + 3
-            self.draw_box(draw, dot_x, dot_y, dot_size, dot_size, fill=event.color)
+            # Wrap text to up to 2 lines
+            text_lines = self.wrap_text(event_text, width - 6, self.fonts['small'], draw, max_lines=2)
 
-            # Draw event text
-            text_x = x + dot_size + 4
-            self.draw_text(
-                draw,
-                event_text,
-                text_x,
-                current_y,
-                self.fonts['small'],
-                self.black,
-                max_width=width - dot_size - 6
-            )
+            # Calculate bar height based on number of lines
+            bar_height = len(text_lines) * line_height + 4
 
-            current_y += event_height
+            # Check if we have space
+            if current_y + bar_height > y + height:
+                break
+
+            # Draw colored bar as background for event
+            self.draw_box(draw, x, current_y, width, bar_height, fill=event.color)
+
+            # Draw each line of text in black on colored background
+            text_y = current_y + 2
+            for line in text_lines:
+                self.draw_text(
+                    draw,
+                    line,
+                    x + 3,
+                    text_y,
+                    self.fonts['small'],
+                    self.black
+                )
+                text_y += line_height
+
+            current_y += bar_height + 2  # Add small gap between events
 
         # Show "+X more" if there are overflow events
         if hasattr(day_events, 'overflow_count') and day_events.overflow_count > 0:
-            if current_y + event_height <= y + height:
+            if current_y + 15 <= y + height:
                 more_text = f"+{day_events.overflow_count} more"
                 self.draw_text(
                     draw,

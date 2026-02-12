@@ -18,6 +18,25 @@ class WeatherInfo:
 class WeatherDataProcessor:
     """Processes weather data from Home Assistant."""
 
+    # Map HA weather conditions to simple text icons that render well
+    WEATHER_ICONS = {
+        'clear-night': '(*)',  # Moon and stars
+        'cloudy': '===',       # Clouds
+        'fog': '~~~',          # Fog
+        'hail': '*#*',         # Hail
+        'lightning': 'ZAP',    # Lightning
+        'lightning-rainy': 'ZAP',
+        'partlycloudy': '(=)',  # Partly cloudy
+        'pouring': '|||',      # Heavy rain
+        'rainy': '\\|/',       # Rain
+        'snowy': '***',        # Snow
+        'snowy-rainy': '*|*',  # Snow/rain mix
+        'sunny': '(O)',        # Sun
+        'windy': '~>',         # Wind
+        'windy-variant': '~>',
+        'exceptional': '!',
+    }
+
     def __init__(self):
         """Initialize weather data processor."""
         self.logger = get_logger()
@@ -68,13 +87,13 @@ class WeatherDataProcessor:
 
     def format_weather_text(self, weather_info):
         """
-        Format weather information as display text.
+        Format weather information as display text with icon.
 
         Args:
             weather_info: WeatherInfo object
 
         Returns:
-            str: Formatted weather text
+            str: Formatted weather text with icon
         """
         if not weather_info:
             return "Weather Unavailable"
@@ -82,11 +101,12 @@ class WeatherDataProcessor:
         # Format temperature with degree symbol
         temp_str = f"{weather_info.temperature:.0f}{weather_info.temperature_unit}"
 
-        # Format condition
-        condition_str = weather_info.condition
+        # Get weather icon (use condition text as fallback)
+        condition_lower = weather_info.condition.lower().replace(' ', '-')
+        icon = self.WEATHER_ICONS.get(condition_lower, weather_info.condition)
 
-        # Combine for display
-        return f"{condition_str}, {temp_str}"
+        # Combine icon and temperature
+        return f"{icon}  {temp_str}"
 
     def format_weather_detailed(self, weather_info):
         """
