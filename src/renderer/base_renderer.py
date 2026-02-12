@@ -29,6 +29,10 @@ class BaseRenderer:
         # Colors
         self.black = self.color_manager.get_rgb('black')
         self.white = self.color_manager.get_rgb('white')
+        self.red = self.color_manager.get_rgb('red')
+        self.yellow = self.color_manager.get_rgb('yellow')
+        self.green = self.color_manager.get_rgb('green')
+        self.blue = self.color_manager.get_rgb('blue')
 
         # Load fonts
         self.fonts = self._load_fonts()
@@ -53,18 +57,18 @@ class BaseRenderer:
         try:
             # Try DejaVu fonts (Linux)
             if os.path.exists(font_paths[0]):
-                fonts['small'] = ImageFont.truetype(font_paths[0], 10)
-                fonts['normal'] = ImageFont.truetype(font_paths[0], 12)
-                fonts['medium'] = ImageFont.truetype(font_paths[0], 14)
-                fonts['large'] = ImageFont.truetype(font_paths[1], 18)
-                fonts['xlarge'] = ImageFont.truetype(font_paths[1], 24)
+                fonts['small'] = ImageFont.truetype(font_paths[0], 12)  # Increased from 10
+                fonts['normal'] = ImageFont.truetype(font_paths[0], 14)  # Increased from 12
+                fonts['medium'] = ImageFont.truetype(font_paths[0], 16)  # Increased from 14
+                fonts['large'] = ImageFont.truetype(font_paths[1], 20)  # Increased from 18
+                fonts['xlarge'] = ImageFont.truetype(font_paths[1], 26)  # Increased from 24
             # Try Arial fonts (Windows)
             elif os.path.exists(font_paths[2]):
-                fonts['small'] = ImageFont.truetype(font_paths[2], 10)
-                fonts['normal'] = ImageFont.truetype(font_paths[2], 12)
-                fonts['medium'] = ImageFont.truetype(font_paths[2], 14)
-                fonts['large'] = ImageFont.truetype(font_paths[3], 18)
-                fonts['xlarge'] = ImageFont.truetype(font_paths[3], 24)
+                fonts['small'] = ImageFont.truetype(font_paths[2], 12)
+                fonts['normal'] = ImageFont.truetype(font_paths[2], 14)
+                fonts['medium'] = ImageFont.truetype(font_paths[2], 16)
+                fonts['large'] = ImageFont.truetype(font_paths[3], 20)
+                fonts['xlarge'] = ImageFont.truetype(font_paths[3], 26)
             else:
                 # Use default fonts
                 self.logger.warning("System fonts not found, using default fonts")
@@ -157,6 +161,55 @@ class BaseRenderer:
 
         return text + ellipsis if text else ellipsis
 
+    def wrap_text(self, text, max_width, font, draw, max_lines=2):
+        """
+        Wrap text to fit within max_width, up to max_lines.
+
+        Args:
+            text: Text to wrap
+            max_width: Maximum width in pixels per line
+            font: Font object
+            draw: ImageDraw object
+            max_lines: Maximum number of lines (default 2)
+
+        Returns:
+            list: List of text lines
+        """
+        words = text.split(' ')
+        lines = []
+        current_line = ''
+
+        for word in words:
+            test_line = current_line + (' ' if current_line else '') + word
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            test_width = bbox[2] - bbox[0]
+
+            if test_width <= max_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                    if len(lines) >= max_lines:
+                        break
+                    current_line = word
+                else:
+                    # Single word is too long, truncate it
+                    current_line = self.truncate_text(word, max_width, font, draw)
+                    lines.append(current_line)
+                    if len(lines) >= max_lines:
+                        break
+                    current_line = ''
+
+        # Add remaining text if we haven't hit max lines
+        if current_line and len(lines) < max_lines:
+            lines.append(current_line)
+
+        # If we have more words and hit max lines, add ellipsis to last line
+        if len(lines) == max_lines and words[words.index(lines[-1].split()[-1]) + 1:]:
+            lines[-1] = self.truncate_text(lines[-1], max_width - 20, font, draw) + '...'
+
+        return lines
+
     def draw_box(self, draw, x, y, width, height, fill=None, outline=None, outline_width=1):
         """
         Draw a rectangle box.
@@ -186,20 +239,20 @@ class BaseRenderer:
         Returns:
             int: Y coordinate where header ends
         """
-        # Draw header background (white)
-        self.draw_box(draw, 0, 0, self.width, height, fill=self.white)
+        # Draw header background with blue color
+        self.draw_box(draw, 0, 0, self.width, height, fill=self.blue)
 
-        # Draw current date
+        # Draw current date in white
         today = datetime.now()
         date_str = today.strftime("%A, %B %d, %Y")
-        self.draw_text(draw, date_str, 20, 15, self.fonts['xlarge'], self.black)
+        self.draw_text(draw, date_str, 20, 15, self.fonts['xlarge'], self.white)
 
-        # Draw weather if available
+        # Draw weather if available in white
         if weather_info:
             from weather_data import WeatherDataProcessor
             weather_processor = WeatherDataProcessor()
             weather_text = weather_processor.format_weather_text(weather_info)
-            self.draw_text(draw, weather_text, 20, 45, self.fonts['medium'], self.black)
+            self.draw_text(draw, weather_text, 20, 45, self.fonts['medium'], self.white)
 
         # Draw separator line
         draw.line([(0, height), (self.width, height)], fill=self.black, width=2)

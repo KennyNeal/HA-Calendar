@@ -1,6 +1,7 @@
 """E-paper display driver for Waveshare 7.3" HAT (E)."""
 
 import os
+from PIL import Image
 from utils.logger import get_logger
 
 
@@ -70,30 +71,48 @@ class EPaperDisplay:
 
     def quantize_image(self, image):
         """
-        Convert PIL Image to e-paper 6-color palette.
+        Convert PIL Image to e-paper 6-color palette with dithering.
 
         Args:
             image: PIL Image object
 
         Returns:
-            PIL.Image: Quantized image
+            PIL.Image: Quantized image with dithering
         """
         # Convert to RGB if needed
         if image.mode != 'RGB':
             image = image.convert('RGB')
 
-        # Get image data
-        pixels = image.load()
-        width, height = image.size
+        # Create a palette image with our 6 e-paper colors
+        # Palette needs to be 768 bytes (256 colors * 3 RGB values)
+        palette_img = Image.new('P', (1, 1))
 
-        # Quantize each pixel to nearest e-paper color
-        for y in range(height):
-            for x in range(width):
-                r, g, b = pixels[x, y]
-                nearest_color = self._find_nearest_color((r, g, b))
-                pixels[x, y] = nearest_color
+        # Build palette: first 6 colors are ours, rest are black
+        palette = []
+        epaper_colors = [
+            (0, 0, 0),      # Black
+            (255, 255, 255), # White
+            (0, 255, 0),    # Green
+            (0, 0, 255),    # Blue
+            (255, 0, 0),    # Red
+            (255, 255, 0),  # Yellow
+        ]
 
-        return image
+        for color in epaper_colors:
+            palette.extend(color)
+
+        # Fill remaining palette slots with black
+        for _ in range(256 - len(epaper_colors)):
+            palette.extend([0, 0, 0])
+
+        palette_img.putpalette(palette)
+
+        # Apply Floyd-Steinberg dithering while quantizing
+        # This creates the illusion of more colors
+        quantized = image.quantize(palette=palette_img, dither=Image.Dither.FLOYDSTEINBERG)
+
+        # Convert back to RGB for compatibility with buffer conversion
+        return quantized.convert('RGB')
 
     def _find_nearest_color(self, rgb):
         """
