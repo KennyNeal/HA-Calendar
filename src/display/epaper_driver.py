@@ -3,19 +3,6 @@
 import os
 from utils.logger import get_logger
 
-# Try to import Waveshare library (may not be available on dev machine)
-try:
-    import sys
-    # Add waveshare lib path (adjust as needed based on installation)
-    lib_path = os.path.join(os.path.dirname(__file__), '../../waveshare_epd')
-    if os.path.exists(lib_path):
-        sys.path.append(lib_path)
-
-    from waveshare_epd import epd7in3e
-    WAVESHARE_AVAILABLE = True
-except ImportError:
-    WAVESHARE_AVAILABLE = False
-
 
 class EPaperDisplay:
     """Driver for Waveshare 7.3" e-Paper HAT (E) with 6-color support."""
@@ -51,24 +38,30 @@ class EPaperDisplay:
             (0, 0, 255): self.EPD_BLUE
         }
 
-        if not self.mock_mode and not WAVESHARE_AVAILABLE:
-            self.logger.warning(
-                "Waveshare library not available. Falling back to mock mode. "
-                "Install waveshare_epd library for hardware support."
-            )
-            self.mock_mode = True
-
     def init_display(self):
         """Initialize the e-paper display hardware."""
         if self.mock_mode:
             self.logger.info("Running in mock mode - no hardware initialization")
             return
 
+        # Import Waveshare library only when needed (not in mock mode)
         try:
+            import sys
+            # Add waveshare lib path (adjust as needed based on installation)
+            lib_path = os.path.join(os.path.dirname(__file__), '../../waveshare_epd')
+            if os.path.exists(lib_path):
+                sys.path.append(lib_path)
+
+            from waveshare_epd import epd7in3e
+
             self.logger.info("Initializing Waveshare 7.3\" e-Paper display...")
             self.epd = epd7in3e.EPD()
             self.epd.init()
             self.logger.info("Display initialized successfully")
+        except ImportError as e:
+            self.logger.error(f"Failed to import Waveshare library: {e}")
+            self.logger.warning("Falling back to mock mode")
+            self.mock_mode = True
         except Exception as e:
             self.logger.error(f"Failed to initialize display: {e}")
             self.logger.warning("Falling back to mock mode")
