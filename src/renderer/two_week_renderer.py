@@ -155,7 +155,7 @@ class TwoWeekRenderer(BaseRenderer):
         for event in events_to_show:
             # Format event text
             if show_time and not event.all_day:
-                time_str = event.start.strftime("%H:%M")
+                time_str = event.start.strftime("%I:%M %p")
                 event_text = f"{time_str} {event.title}"
             else:
                 event_text = event.title

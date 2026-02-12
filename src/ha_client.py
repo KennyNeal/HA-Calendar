@@ -156,8 +156,15 @@ class HomeAssistantClient:
             state_data = self.get_state(view_entity)
             view = state_data.get('state', '').lower().replace(' ', '_').replace('-', '_')
 
+            # Map numeric view names to spelled-out versions
+            view_mappings = {
+                '4_day': 'four_day',
+                '2_week': 'two_week'
+            }
+            view = view_mappings.get(view, view)
+
             # Validate view name
-            valid_views = ['two_week', 'month', 'week', 'agenda']
+            valid_views = ['two_week', 'four_day', 'month', 'week', 'agenda']
             if view in valid_views:
                 self.logger.info(f"Current view: {view}")
                 return view

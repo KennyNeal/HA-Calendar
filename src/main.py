@@ -3,6 +3,7 @@
 import sys
 import os
 import yaml
+import fcntl
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -240,4 +241,27 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # Use file locking to prevent concurrent display access
+    lock_file = '/tmp/ha-calendar.lock'
+    lock_fd = None
+
+    try:
+        # Try to acquire lock
+        lock_fd = open(lock_file, 'w')
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        # Lock acquired, run main
+        main()
+
+    except IOError:
+        # Could not acquire lock - another instance is running
+        print("Another calendar update is already running. Exiting.")
+        sys.exit(0)
+    finally:
+        # Release lock
+        if lock_fd:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                lock_fd.close()
+            except:
+                pass
