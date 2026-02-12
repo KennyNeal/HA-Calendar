@@ -227,14 +227,14 @@ class BaseRenderer:
         coords = [(x, y), (x + width, y + height)]
         draw.rectangle(coords, fill=fill, outline=outline, width=outline_width)
 
-    def draw_header(self, draw, weather_info, height=80):
+    def draw_header(self, draw, weather_info, height=50):
         """
-        Draw header with date and weather.
+        Draw compact header with date and weather on same line.
 
         Args:
             draw: ImageDraw object
             weather_info: WeatherInfo object or None
-            height: Header height in pixels
+            height: Header height in pixels (default 50)
 
         Returns:
             int: Y coordinate where header ends
@@ -242,17 +242,24 @@ class BaseRenderer:
         # Draw header background with blue color
         self.draw_box(draw, 0, 0, self.width, height, fill=self.blue)
 
-        # Draw current date in white
+        # Calculate vertical centering
+        text_y = (height - 26) // 2  # Center the xlarge font (26px) vertically
+
+        # Draw current date in white (left side)
         today = datetime.now()
         date_str = today.strftime("%A, %B %d, %Y")
-        self.draw_text(draw, date_str, 20, 15, self.fonts['xlarge'], self.white)
+        self.draw_text(draw, date_str, 20, text_y, self.fonts['xlarge'], self.white)
 
-        # Draw weather if available in white
+        # Draw weather on right side if available (same vertical position)
         if weather_info:
             from weather_data import WeatherDataProcessor
             weather_processor = WeatherDataProcessor()
             weather_text = weather_processor.format_weather_text(weather_info)
-            self.draw_text(draw, weather_text, 20, 45, self.fonts['medium'], self.white)
+            # Calculate position from right edge
+            bbox = draw.textbbox((0, 0), weather_text, font=self.fonts['medium'])
+            weather_width = bbox[2] - bbox[0]
+            weather_x = self.width - 20 - weather_width
+            self.draw_text(draw, weather_text, weather_x, text_y + 4, self.fonts['medium'], self.white)
 
         # Draw separator line
         draw.line([(0, height), (self.width, height)], fill=self.black, width=2)

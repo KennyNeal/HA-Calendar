@@ -32,12 +32,12 @@ class FourDayRenderer(BaseRenderer):
         image, draw = self.create_canvas()
 
         # Draw header with weather
-        header_height = 80
+        header_height = 50
         y = self.draw_header(draw, weather_info, header_height)
 
         # Calculate column dimensions
         # Layout: 4 columns (4 days)
-        footer_height = 20
+        footer_height = 0  # No footer needed
         available_height = self.height - header_height - footer_height
         col_width = self.width // 4
 
@@ -110,7 +110,8 @@ class FourDayRenderer(BaseRenderer):
 
     def _draw_events_in_column(self, draw, x, y, width, height, day_events):
         """
-        Draw events within a column.
+        Draw events within a column with time-based vertical positioning.
+        Event heights are proportional to their duration.
 
         Args:
             draw: ImageDraw object
@@ -124,8 +125,19 @@ class FourDayRenderer(BaseRenderer):
         show_time = self.view_config.get('show_time', True)
 
         events_to_show = day_events.events[:max_events]
-        current_y = y
         line_height = 14  # Height per line of text
+
+        # Time range for positioning: 6 AM (hour 6) to 10 PM (hour 22) = 16 hours
+        start_hour = 6
+        end_hour = 22
+        time_range_hours = end_hour - start_hour
+        pixels_per_hour = height / time_range_hours
+
+        # Minimum bar height for readability
+        min_bar_height = 22
+
+        # Track occupied vertical space to detect overlaps
+        occupied_slots = []
 
         for event in events_to_show:
             # Format event text
@@ -135,43 +147,68 @@ class FourDayRenderer(BaseRenderer):
             else:
                 event_text = event.title
 
-            # Wrap text to up to 3 lines (more space in 4-day view)
-            text_lines = self.wrap_text(event_text, width - 6, self.fonts['small'], draw, max_lines=3)
+            # Calculate vertical position based on event time
+            if event.all_day:
+                # All-day events go at the top with fixed small height
+                event_y = y
+                bar_height = min_bar_height
+            else:
+                # Convert start time to hours (with decimal for minutes)
+                event_hour = event.start.hour + event.start.minute / 60.0
 
-            # Calculate bar height based on number of lines
-            bar_height = len(text_lines) * line_height + 4
+                # Clamp to our display range
+                if event_hour < start_hour:
+                    event_hour = start_hour
+                elif event_hour > end_hour:
+                    event_hour = end_hour
 
-            # Check if we have space
-            if current_y + bar_height > y + height:
-                break
+                # Calculate position
+                hours_from_start = event_hour - start_hour
+                event_y = y + int(hours_from_start * pixels_per_hour)
+
+                # Calculate bar height based on event duration
+                duration_hours = (event.end - event.start).total_seconds() / 3600.0
+                bar_height = max(int(duration_hours * pixels_per_hour), min_bar_height)
+
+            # Wrap text to fit in the bar
+            # More lines allowed for longer events
+            max_text_lines = max(2, min(5, bar_height // line_height - 1))
+            text_lines = self.wrap_text(event_text, width - 6, self.fonts['small'], draw, max_lines=max_text_lines)
+
+            # Check if this overlaps with previous events at the same time
+            # If so, nudge it down slightly
+            for occupied_start, occupied_end in occupied_slots:
+                if event_y < occupied_end and event_y + bar_height > occupied_start:
+                    # Overlap detected - nudge down
+                    event_y = occupied_end + 2
+
+            # Ensure it doesn't go off the bottom
+            if event_y + bar_height > y + height:
+                # Try to shrink the bar to fit
+                bar_height = max((y + height) - event_y, min_bar_height)
+                if event_y + bar_height > y + height:
+                    # Still doesn't fit - skip this event
+                    continue
+
+            # Record this slot as occupied
+            occupied_slots.append((event_y, event_y + bar_height))
 
             # Draw colored bar as background for event
-            self.draw_box(draw, x, current_y, width, bar_height, fill=event.color)
+            self.draw_box(draw, x, event_y, width, bar_height, fill=event.color)
 
-            # Draw each line of text in white on colored background
-            text_y = current_y + 2
+            # Draw text lines centered vertically in the bar
+            total_text_height = len(text_lines) * line_height
+            text_start_y = event_y + max(2, (bar_height - total_text_height) // 2)
+
             for line in text_lines:
-                self.draw_text(
-                    draw,
-                    line,
-                    x + 3,
-                    text_y,
-                    self.fonts['small'],
-                    self.white
-                )
-                text_y += line_height
-
-            current_y += bar_height + 2  # Add small gap between events
-
-        # Show "+X more" if there are overflow events
-        if hasattr(day_events, 'overflow_count') and day_events.overflow_count > 0:
-            if current_y + 15 <= y + height:
-                more_text = f"+{day_events.overflow_count} more"
-                self.draw_text(
-                    draw,
-                    more_text,
-                    x,
-                    current_y,
-                    self.fonts['small'],
-                    self.black
-                )
+                # Make sure text doesn't overflow the bar
+                if text_start_y + line_height <= event_y + bar_height - 2:
+                    self.draw_text(
+                        draw,
+                        line,
+                        x + 3,
+                        text_start_y,
+                        self.fonts['small'],
+                        self.white
+                    )
+                    text_start_y += line_height
