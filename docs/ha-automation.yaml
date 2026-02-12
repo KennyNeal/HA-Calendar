@@ -1,0 +1,18 @@
+# HA Calendar Display - Instant Refresh Automation
+# Add this to your Home Assistant configuration.yaml or automations.yaml
+
+automation:
+  - alias: "E-Ink Calendar - Refresh on View Change"
+    description: "Trigger calendar display refresh when view selector changes"
+    trigger:
+      - platform: state
+        entity_id: input_select.calendar_view
+    action:
+      - service: shell_command.refresh_calendar_display
+    mode: single
+
+# Add this to your configuration.yaml under shell_command section:
+shell_command:
+  refresh_calendar_display: "curl -X POST http://<PI-IP>:8765/refresh"
+
+# Replace <PI-IP> with your actual Raspberry Pi IP address
