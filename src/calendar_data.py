@@ -54,14 +54,20 @@ class CalendarDataProcessor:
         """
         try:
             # Parse start and end times
-            start = parser.isoparse(event_data['start'])
-            end = parser.isoparse(event_data['end'])
+            # Handle both datetime strings and date-only strings
+            start_str = event_data['start']
+            end_str = event_data['end']
 
-            # Determine if all-day event
-            # HA represents all-day events with dates (no time component)
-            # or with start/end as date strings
-            all_day = isinstance(event_data.get('start'), str) and 'T' not in event_data['start']
-            if not all_day:
+            # Check if these are date-only strings (YYYY-MM-DD format)
+            if isinstance(start_str, str) and 'T' not in start_str:
+                # Date-only event (all-day)
+                start = datetime.strptime(start_str, '%Y-%m-%d')
+                end = datetime.strptime(end_str, '%Y-%m-%d')
+                all_day = True
+            else:
+                # Full datetime
+                start = parser.isoparse(start_str)
+                end = parser.isoparse(end_str)
                 # Check if it's a full-day span (midnight to midnight)
                 all_day = (
                     start.time() == time(0, 0, 0) and
