@@ -1,0 +1,69 @@
+# Home Assistant Configuration
+home_assistant:
+  url: "http://homeassistant.local:8123"
+  token: "YOUR_LONG_LIVED_ACCESS_TOKEN_HERE"
+  timeout: 10  # seconds
+
+# Calendar sources
+# Add your calendar entities here. Each calendar will be assigned a color from the available palette.
+calendars:
+  - entity_id: "calendar.family"
+    display_name: "Family"
+    color: "red"
+  - entity_id: "calendar.prairieville_high_school_football"
+    display_name: "Football"
+    color: "green"
+  # Add more calendars as needed (up to 4 for unique colors)
+  # - entity_id: "calendar.work"
+  #   display_name: "Work"
+  #   color: "green"
+  # - entity_id: "calendar.holidays"
+  #   display_name: "Holidays"
+  #   color: "blue"
+
+# Weather entity
+weather:
+  entity_id: "weather.forecast_home"
+
+# View selector
+# This input_select entity determines which view to display
+view_selector:
+  entity_id: "input_select.calendar_view"
+  default_view: "two_week"  # fallback if entity unavailable (two_week, month, week, agenda)
+
+# Display settings
+display:
+  width: 800
+  height: 480
+  # Available colors for Waveshare 7.3" HAT (E)
+  colors:
+    black: 0x000000
+    white: 0xFFFFFF
+    red: 0xFF0000
+    yellow: 0xFFFF00
+    green: 0x00FF00
+    blue: 0x0000FF
+  rotation: 0  # 0, 90, 180, 270
+  mock_mode: false  # Set to true for development without hardware (saves PNG instead)
+
+# View-specific settings
+views:
+  two_week:
+    show_time: true
+    max_events_per_day: 3
+  week:
+    show_time: true
+    max_events_per_day: 5
+  month:
+    show_time: false
+    max_events_per_day: 2
+  agenda:
+    days_ahead: 14
+    show_all_events: true
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/calendar.log"
+  max_bytes: 1048576  # 1MB
+  backup_count: 3

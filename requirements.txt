@@ -1,0 +1,7 @@
+requests>=2.31.0
+PyYAML>=6.0
+python-dateutil>=2.8.2
+pytz>=2023.3
+spidev>=3.6
+RPi.GPIO>=0.7.1
+# Note: Pillow is installed via apt (python3-pil) for better Raspberry Pi compatibility
