@@ -1,6 +1,9 @@
 # Configuration files with secrets
 config/config.yaml
 
+# Temporary Claude files
+tempclaude*
+
 # Python
 __pycache__/
 *.py[cod]
