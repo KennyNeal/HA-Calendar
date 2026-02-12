@@ -173,7 +173,7 @@ class TwoWeekRenderer(BaseRenderer):
             # Draw colored bar as background for event
             self.draw_box(draw, x, current_y, width, bar_height, fill=event.color)
 
-            # Draw each line of text in black on colored background
+            # Draw each line of text in white on colored background
             text_y = current_y + 2
             for line in text_lines:
                 self.draw_text(
@@ -182,7 +182,7 @@ class TwoWeekRenderer(BaseRenderer):
                     x + 3,
                     text_y,
                     self.fonts['small'],
-                    self.black
+                    self.white
                 )
                 text_y += line_height
 

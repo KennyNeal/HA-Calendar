@@ -82,17 +82,14 @@ class FourDayRenderer(BaseRenderer):
         border_width = 1
         self.draw_box(draw, x, y, width, height, outline=self.black, outline_width=border_width)
 
-        # Highlight today with thick green left border
-        if is_today:
-            for i in range(8):
-                draw.line([(x + i, y), (x + i, y + height)], fill=self.green, width=1)
+        # Note: No highlight for today since it's always the first column
 
         # Draw day name and date
         day_name = date_obj.strftime("%A")
         date_str = date_obj.strftime("%b %d")
 
         padding = 5
-        text_x = x + padding + (8 if is_today else 0)
+        text_x = x + padding
 
         # Day name (larger)
         self.draw_text(draw, day_name, text_x, y + padding, self.fonts['large'], self.black)
@@ -106,7 +103,7 @@ class FourDayRenderer(BaseRenderer):
                 draw,
                 text_x,
                 y + 60,  # Start below the date
-                width - padding - (8 if is_today else 0) - padding,
+                width - (2 * padding),
                 height - 65,
                 day_events
             )
@@ -151,7 +148,7 @@ class FourDayRenderer(BaseRenderer):
             # Draw colored bar as background for event
             self.draw_box(draw, x, current_y, width, bar_height, fill=event.color)
 
-            # Draw each line of text in black on colored background
+            # Draw each line of text in white on colored background
             text_y = current_y + 2
             for line in text_lines:
                 self.draw_text(
@@ -160,7 +157,7 @@ class FourDayRenderer(BaseRenderer):
                     x + 3,
                     text_y,
                     self.fonts['small'],
-                    self.black
+                    self.white
                 )
                 text_y += line_height
 

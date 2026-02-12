@@ -112,7 +112,15 @@ def main():
         # Initialize components
         logger.info("Initializing components...")
         color_manager = ColorManager(config)
-        color_manager.assign_calendar_colors(config['calendars'])
+        assigned_colors = color_manager.assign_calendar_colors(config['calendars'])
+
+        # Debug: Log calendar color assignments
+        logger.info("Calendar color assignments from config:")
+        for calendar in config['calendars']:
+            logger.info(f"  {calendar['entity_id']}: color={calendar.get('color', 'auto')}")
+        logger.info("ColorManager assigned colors:")
+        for entity_id, color_info in assigned_colors.items():
+            logger.info(f"  {entity_id}: {color_info['name']} RGB{color_info['rgb']}")
 
         ha_client = HomeAssistantClient(config)
         calendar_processor = CalendarDataProcessor(color_manager)
