@@ -2,7 +2,7 @@
 config/config.yaml
 
 # Temporary Claude files
-tempclaude*
+tmpclaude*
 
 # Python
 __pycache__/
