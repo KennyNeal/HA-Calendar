@@ -54,26 +54,36 @@ class CalendarDataProcessor:
         """
         try:
             # Parse start and end times
-            # Handle both datetime strings and date-only strings
-            start_str = event_data['start']
-            end_str = event_data['end']
+            # Handle HA's nested date structure
+            start_data = event_data['start']
+            end_data = event_data['end']
 
-            # Check if these are date-only strings (YYYY-MM-DD format)
-            if isinstance(start_str, str) and 'T' not in start_str:
-                # Date-only event (all-day)
-                start = datetime.strptime(start_str, '%Y-%m-%d')
-                end = datetime.strptime(end_str, '%Y-%m-%d')
+            # Check if it's an all-day event (has 'date' key)
+            if 'date' in start_data:
+                # All-day event - make timezone-aware
+                start = datetime.strptime(start_data['date'], '%Y-%m-%d')
+                end = datetime.strptime(end_data['date'], '%Y-%m-%d')
+                # Make timezone-aware (using local timezone)
+                import pytz
+                local_tz = pytz.timezone('America/Chicago')  # Adjust to your timezone
+                start = local_tz.localize(start)
+                end = local_tz.localize(end)
                 all_day = True
-            else:
-                # Full datetime
-                start = parser.isoparse(start_str)
-                end = parser.isoparse(end_str)
-                # Check if it's a full-day span (midnight to midnight)
+            elif 'dateTime' in start_data:
+                # Timed event
+                start = parser.isoparse(start_data['dateTime'])
+                end = parser.isoparse(end_data['dateTime'])
+                # Check if it spans full days
                 all_day = (
                     start.time() == time(0, 0, 0) and
                     end.time() == time(0, 0, 0) and
                     (end - start).days >= 1
                 )
+            else:
+                # Fallback: try to parse as-is
+                start = parser.isoparse(str(start_data))
+                end = parser.isoparse(str(end_data))
+                all_day = False
 
             # Get color for this calendar
             color_info = self.color_manager.get_calendar_color(calendar_id)
@@ -90,6 +100,7 @@ class CalendarDataProcessor:
             )
         except Exception as e:
             self.logger.error(f"Failed to parse event: {e}")
+            self.logger.error(f"Event data: {event_data}")
             return None
 
     def parse_all_events(self, all_calendar_events):

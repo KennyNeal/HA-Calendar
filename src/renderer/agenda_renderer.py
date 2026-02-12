@@ -151,10 +151,7 @@ class AgendaRenderer(BaseRenderer):
             # Add spacing between days
             content_y += 10
 
-        # Draw legend in footer
-        footer_y = header_height + available_height
-        legend_data = self.color_manager.get_legend()
-        self.draw_legend(draw, footer_y + 5, legend_data)
+        # Legend removed - calendar colors are self-explanatory
 
         self.logger.info("Rendered agenda list view")
         return image

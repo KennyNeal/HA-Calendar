@@ -92,10 +92,7 @@ class MonthRenderer(BaseRenderer):
 
                 current_date += timedelta(days=1)
 
-        # Draw legend in footer
-        footer_y = header_height + available_height
-        legend_data = self.color_manager.get_legend()
-        self.draw_legend(draw, footer_y + 5, legend_data)
+        # Legend removed - calendar colors are self-explanatory
 
         self.logger.info("Rendered month calendar view")
         return image

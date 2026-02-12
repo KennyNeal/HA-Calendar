@@ -27,6 +27,7 @@ class EPaperDisplay:
         self.display_config = config['display']
         self.mock_mode = self.display_config.get('mock_mode', False)
         self.epd = None
+        self.is_sleeping = False  # Track sleep state
 
         # Color mapping for quantization
         self.color_map = {
@@ -173,12 +174,12 @@ class EPaperDisplay:
         # This method converts the RGB image to the specific format
         # required by the Waveshare 7.3" HAT (E)
 
-        # The 7.3" HAT (E) uses a specific color encoding
-        # Each pixel is mapped to a color code
-        buf = [0x00] * (self.display_config['width'] * self.display_config['height'])
+        # The 7.3" HAT (E) uses 4 bits per pixel (2 pixels per byte)
+        # Buffer size is width * height / 2
+        width, height = image.size
+        buf = [0x00] * (width * height // 2)
 
         pixels = image.load()
-        width, height = image.size
 
         for y in range(height):
             for x in range(width):
@@ -201,7 +202,16 @@ class EPaperDisplay:
                 else:
                     color_code = 0x00  # Default to black
 
-                buf[y * width + x] = color_code
+                # Pack 2 pixels per byte (4 bits each)
+                pixel_index = y * width + x
+                byte_index = pixel_index // 2
+
+                if pixel_index % 2 == 0:
+                    # First pixel in byte (high nibble)
+                    buf[byte_index] = (color_code << 4) & 0xF0
+                else:
+                    # Second pixel in byte (low nibble)
+                    buf[byte_index] |= color_code & 0x0F
 
         return bytes(buf)
 
@@ -225,10 +235,14 @@ class EPaperDisplay:
             self.logger.info("Mock mode: Display sleep requested")
             return
 
+        if self.is_sleeping:
+            return  # Already sleeping, don't try again
+
         try:
             if self.epd:
                 self.logger.info("Putting display to sleep...")
                 self.epd.sleep()
+                self.is_sleeping = True
                 self.logger.info("Display is now in sleep mode")
         except Exception as e:
             self.logger.error(f"Failed to sleep display: {e}")
