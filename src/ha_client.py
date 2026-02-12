@@ -154,7 +154,7 @@ class HomeAssistantClient:
         try:
             view_entity = self.config['view_selector']['entity_id']
             state_data = self.get_state(view_entity)
-            view = state_data.get('state', '').lower().replace(' ', '_')
+            view = state_data.get('state', '').lower().replace(' ', '_').replace('-', '_')
 
             # Validate view name
             valid_views = ['two_week', 'month', 'week', 'agenda']
