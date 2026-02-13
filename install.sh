@@ -27,6 +27,7 @@ sudo apt-get update
 echo "[2/8] Installing system dependencies..."
 sudo apt-get install -y python3 python3-pip python3-venv python3-pil \
     fonts-dejavu fonts-dejavu-core fonts-dejavu-extra \
+    fonts-liberation fonts-roboto-unhinted fonts-ubuntu fonts-noto \
     libopenjp2-7
 
 # Enable SPI (required for e-paper display)

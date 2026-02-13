@@ -149,8 +149,24 @@ class TwoWeekRenderer(BaseRenderer):
         show_time = self.view_config.get('show_time', True)
 
         events_to_show = day_events.events[:max_events]
+        num_events = len(events_to_show)
+        
+        # Dynamic sizing based on number of events
+        # Fewer events = larger, more readable text
+        if num_events <= 2:
+            line_height = 18
+            font_key = 'medium'
+            max_lines_per_event = 3
+        elif num_events <= 3:
+            line_height = 16
+            font_key = 'normal'
+            max_lines_per_event = 2
+        else:
+            line_height = 14
+            font_key = 'small'
+            max_lines_per_event = 2
+        
         current_y = y
-        line_height = 14  # Height per line of text
 
         for event in events_to_show:
             # Format event text
@@ -160,8 +176,8 @@ class TwoWeekRenderer(BaseRenderer):
             else:
                 event_text = event.title
 
-            # Wrap text to up to 2 lines
-            text_lines = self.wrap_text(event_text, width - 6, self.fonts['small'], draw, max_lines=2)
+            # Wrap text
+            text_lines = self.wrap_text(event_text, width - 6, self.fonts[font_key], draw, max_lines=max_lines_per_event)
 
             # Calculate bar height based on number of lines
             bar_height = len(text_lines) * line_height + 4
@@ -181,7 +197,7 @@ class TwoWeekRenderer(BaseRenderer):
                     line,
                     x + 3,
                     text_y,
-                    self.fonts['small'],
+                    self.fonts[font_key],
                     self.white
                 )
                 text_y += line_height

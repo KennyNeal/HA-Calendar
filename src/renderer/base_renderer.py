@@ -40,62 +40,85 @@ class BaseRenderer:
     def _load_fonts(self):
         """
         Load fonts for rendering.
+        
+        Prioritizes fonts that render cleanly on e-paper displays:
+        - Liberation Sans (excellent hinting, very clean)
+        - Roboto (Google's font, designed for screens)
+        - Ubuntu (clean and modern)
+        - Noto Sans (very readable)
+        - DejaVu Sans (fallback)
 
         Returns:
             dict: Dictionary of font objects by name
         """
-        # Try to use system fonts, fall back to defaults
-        font_paths = [
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-            '/usr/share/fonts/truetype/weather-icons/weathericons-regular-webfont.ttf',
-            'C:/Windows/Fonts/arial.ttf',  # Windows fallback
-            'C:/Windows/Fonts/arialbd.ttf',
-            'C:/Windows/Fonts/weathericons-regular-webfont.ttf'  # Windows weather icons
-        ]
+        # Font paths in order of preference (best for e-paper first)
+        font_paths = {
+            'regular': [
+                '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',  # Best for e-paper
+                '/usr/share/fonts/truetype/roboto/Roboto-Regular.ttf',
+                '/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf',
+                '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                'C:/Windows/Fonts/arial.ttf',  # Windows fallback
+            ],
+            'bold': [
+                '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+                '/usr/share/fonts/truetype/roboto/Roboto-Bold.ttf',
+                '/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf',
+                '/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf',
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+                'C:/Windows/Fonts/arialbd.ttf',
+            ],
+            'weather': [
+                '/usr/share/fonts/truetype/weather-icons/weathericons-regular-webfont.ttf',
+                'C:/Windows/Fonts/weathericons-regular-webfont.ttf'
+            ]
+        }
 
         fonts = {}
 
+        # Find best available regular font
+        regular_font = None
+        for path in font_paths['regular']:
+            if os.path.exists(path):
+                regular_font = path
+                self.logger.info(f"Using font: {os.path.basename(path)}")
+                break
+
+        # Find best available bold font
+        bold_font = None
+        for path in font_paths['bold']:
+            if os.path.exists(path):
+                bold_font = path
+                break
+
         try:
-            # Try DejaVu fonts (Linux)
-            if os.path.exists(font_paths[0]):
-                fonts['small'] = ImageFont.truetype(font_paths[0], 12)  # Increased from 10
-                fonts['normal'] = ImageFont.truetype(font_paths[0], 14)  # Increased from 12
-                fonts['medium'] = ImageFont.truetype(font_paths[0], 16)  # Increased from 14
-                fonts['large'] = ImageFont.truetype(font_paths[1], 20)  # Increased from 18
-                fonts['xlarge'] = ImageFont.truetype(font_paths[1], 26)  # Increased from 24
+            if regular_font and bold_font:
+                # Load regular weight fonts with optimized sizes for e-paper
+                fonts['small'] = ImageFont.truetype(regular_font, 13)   # Slightly larger
+                fonts['normal'] = ImageFont.truetype(regular_font, 15)  # Slightly larger
+                fonts['medium'] = ImageFont.truetype(regular_font, 17)  # Slightly larger
+                fonts['large'] = ImageFont.truetype(bold_font, 21)      # Slightly larger
+                fonts['xlarge'] = ImageFont.truetype(bold_font, 27)     # Slightly larger
                 
                 # Try to load weather icons font
-                if os.path.exists(font_paths[2]):
-                    fonts['weather_small'] = ImageFont.truetype(font_paths[2], 20)
-                    fonts['weather_medium'] = ImageFont.truetype(font_paths[2], 28)
-                    fonts['weather_large'] = ImageFont.truetype(font_paths[2], 36)
-                else:
-                    self.logger.warning("Weather Icons font not found, weather icons may not render correctly")
-                    fonts['weather_small'] = fonts['normal']
-                    fonts['weather_medium'] = fonts['medium']
-                    fonts['weather_large'] = fonts['large']
-            # Try Arial fonts (Windows)
-            elif os.path.exists(font_paths[3]):
-                fonts['small'] = ImageFont.truetype(font_paths[3], 12)
-                fonts['normal'] = ImageFont.truetype(font_paths[3], 14)
-                fonts['medium'] = ImageFont.truetype(font_paths[3], 16)
-                fonts['large'] = ImageFont.truetype(font_paths[4], 20)
-                fonts['xlarge'] = ImageFont.truetype(font_paths[4], 26)
+                weather_font_loaded = False
+                for path in font_paths['weather']:
+                    if os.path.exists(path):
+                        fonts['weather_small'] = ImageFont.truetype(path, 22)
+                        fonts['weather_medium'] = ImageFont.truetype(path, 30)
+                        fonts['weather_large'] = ImageFont.truetype(path, 38)
+                        weather_font_loaded = True
+                        break
                 
-                # Try to load weather icons font (Windows)
-                if os.path.exists(font_paths[5]):
-                    fonts['weather_small'] = ImageFont.truetype(font_paths[5], 20)
-                    fonts['weather_medium'] = ImageFont.truetype(font_paths[5], 28)
-                    fonts['weather_large'] = ImageFont.truetype(font_paths[5], 36)
-                else:
+                if not weather_font_loaded:
                     self.logger.warning("Weather Icons font not found, weather icons may not render correctly")
                     fonts['weather_small'] = fonts['normal']
                     fonts['weather_medium'] = fonts['medium']
                     fonts['weather_large'] = fonts['large']
             else:
                 # Use default fonts
-                self.logger.warning("System fonts not found, using default fonts")
+                self.logger.warning("Preferred fonts not found, using default fonts (may look pixelated)")
                 fonts['small'] = ImageFont.load_default()
                 fonts['normal'] = ImageFont.load_default()
                 fonts['medium'] = ImageFont.load_default()
