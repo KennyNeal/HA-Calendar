@@ -18,23 +18,25 @@ class WeatherInfo:
 class WeatherDataProcessor:
     """Processes weather data from Home Assistant."""
 
-    # Map HA weather conditions to simple text icons that render well
+    # Map HA weather conditions to Weather Icons font Unicode characters
+    # Weather Icons font: https://erikflowers.github.io/weather-icons/
+    # Install font file: weathericons-regular-webfont.ttf
     WEATHER_ICONS = {
-        'clear-night': '(*)',  # Moon and stars
-        'cloudy': '===',       # Clouds
-        'fog': '~~~',          # Fog
-        'hail': '*#*',         # Hail
-        'lightning': 'ZAP',    # Lightning
-        'lightning-rainy': 'ZAP',
-        'partlycloudy': '(=)',  # Partly cloudy
-        'pouring': '|||',      # Heavy rain
-        'rainy': '\\|/',       # Rain
-        'snowy': '***',        # Snow
-        'snowy-rainy': '*|*',  # Snow/rain mix
-        'sunny': '(O)',        # Sun
-        'windy': '~>',         # Wind
-        'windy-variant': '~>',
-        'exceptional': '!',
+        'clear-night': '\uf02e',      # Night
+        'cloudy': '\uf013',           # Cloud
+        'fog': '\uf014',              # Fog
+        'hail': '\uf015',             # Hail
+        'lightning': '\uf016',        # Lightning
+        'lightning-rainy': '\uf017',  # Lightning with rain
+        'partlycloudy': '\uf002',     # Partly cloudy
+        'pouring': '\uf018',          # Pouring rain
+        'rainy': '\uf019',            # Rain
+        'snowy': '\uf01b',            # Snow
+        'snowy-rainy': '\uf01c',      # Rain and snow
+        'sunny': '\uf00d',            # Sunny
+        'windy': '\uf021',            # Windy
+        'windy-variant': '\uf021',    # Windy variant
+        'exceptional': '\uf03b',      # Tornado/exceptional
     }
 
     def __init__(self):
@@ -128,3 +130,34 @@ class WeatherDataProcessor:
             'humidity': f"{weather_info.humidity}%",
             'wind': f"{weather_info.wind_speed:.0f} {weather_info.wind_speed_unit}"
         }
+
+    def get_weather_icon(self, condition):
+        """
+        Get Weather Icons font character for weather condition.
+
+        Args:
+            condition: Weather condition string (e.g., 'sunny', 'rainy')
+
+        Returns:
+            str: Unicode character from Weather Icons font
+        """
+        # Normalize condition to lowercase and match against known conditions
+        condition_key = condition.lower() if condition else None
+        return self.WEATHER_ICONS.get(condition_key, '\uf03b')  # Default to exceptional
+
+    def format_weather_with_icon(self, weather_info):
+        """
+        Format weather with icon and temperature.
+
+        Args:
+            weather_info: WeatherInfo object
+
+        Returns:
+            str: Formatted string with weather icon and temperature
+        """
+        if not weather_info:
+            return "N/A"
+
+        icon = self.get_weather_icon(weather_info.condition.lower())
+        temp_str = f"{weather_info.temperature:.0f}{weather_info.temperature_unit}"
+        return f"{icon} {temp_str}"
