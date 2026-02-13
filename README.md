@@ -31,11 +31,13 @@ Clone this repository to your Raspberry Pi:
 
 ```bash
 cd ~
-git clone <repository-url> HA-Calendar
+git clone https://github.com/KennyNeal/HA-Calendar.git
 cd HA-Calendar
 ```
 
 Or download and extract the files manually.
+
+**Recommended**: Use Git for easy updates and branch switching. See [docs/GIT_SETUP.md](docs/GIT_SETUP.md) for details.
 
 ### 2. Run Installation Script
 
@@ -155,6 +157,46 @@ Add this line (adjust path if needed):
 ```
 
 This will update the display every hour at the top of the hour.
+
+### 7. Git and GitHub Integration (Recommended)
+
+Using Git allows you to easily update the calendar software and switch between feature branches.
+
+#### Set Up Git
+
+```bash
+# Configure Git (if not already done)
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+```
+
+#### Working with Branches
+
+```bash
+# Fetch latest changes from GitHub
+git fetch origin
+
+# Switch to main branch
+git checkout main
+
+# Switch to a feature branch (e.g., Dynamic-size)
+git checkout Dynamic-size
+
+# Pull latest updates
+git pull
+```
+
+#### Update to Latest Version
+
+```bash
+cd ~/HA-Calendar
+git pull
+python3 src/main.py  # Test the changes
+```
+
+**Note**: Your `config/config.yaml` file is automatically ignored by Git and won't be affected by updates.
+
+For detailed Git instructions, see **[docs/GIT_SETUP.md](docs/GIT_SETUP.md)**.
 
 ## View Modes
 
@@ -289,6 +331,14 @@ calendars:
 You can add up to 4 calendars with unique colors (red, yellow, green, blue). Additional calendars will cycle through colors.
 
 ## Development
+
+### Working with Git
+
+This project uses Git for version control. See **[docs/GIT_SETUP.md](docs/GIT_SETUP.md)** for:
+- Branch management
+- Getting updates from GitHub
+- Contributing changes
+- Troubleshooting Git issues
 
 ### Running in Mock Mode
 

@@ -125,16 +125,28 @@ class FourDayRenderer(BaseRenderer):
         show_time = self.view_config.get('show_time', True)
 
         events_to_show = day_events.events[:max_events]
-        line_height = 14  # Height per line of text
+        num_events = len(events_to_show)
+        
+        # Dynamic sizing based on number of events
+        # Fewer events = larger, more readable text
+        if num_events <= 3:
+            line_height = 18
+            min_bar_height = 36
+            font_key = 'medium'
+        elif num_events <= 6:
+            line_height = 16
+            min_bar_height = 28
+            font_key = 'normal'
+        else:
+            line_height = 14
+            min_bar_height = 22
+            font_key = 'small'
 
         # Time range for positioning: 6 AM (hour 6) to 10 PM (hour 22) = 16 hours
         start_hour = 6
         end_hour = 22
         time_range_hours = end_hour - start_hour
         pixels_per_hour = height / time_range_hours
-
-        # Minimum bar height for readability
-        min_bar_height = 22
 
         # Track occupied vertical space to detect overlaps
         occupied_slots = []
@@ -172,8 +184,8 @@ class FourDayRenderer(BaseRenderer):
 
             # Wrap text to fit in the bar
             # More lines allowed for longer events
-            max_text_lines = max(2, min(5, bar_height // line_height - 1))
-            text_lines = self.wrap_text(event_text, width - 6, self.fonts['small'], draw, max_lines=max_text_lines)
+            max_text_lines = max(1, min(5, bar_height // line_height - 1))
+            text_lines = self.wrap_text(event_text, width - 6, self.fonts[font_key], draw, max_lines=max_text_lines)
 
             # Check if this overlaps with previous events at the same time
             # If so, nudge it down slightly
@@ -208,7 +220,7 @@ class FourDayRenderer(BaseRenderer):
                         line,
                         x + 3,
                         text_start_y,
-                        self.fonts['small'],
+                        self.fonts[font_key],
                         self.white
                     )
                     text_start_y += line_height

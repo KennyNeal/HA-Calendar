@@ -155,12 +155,20 @@ class MonthRenderer(BaseRenderer):
             height: Available height
             day_events: DayEvents object
         """
-        max_events = self.view_config.get('max_events_per_day', 2)
+        max_events = self.view_config.get('max_events_per_day', 3)
         events_to_show = day_events.events[:max_events]
-
-        # Draw colored dots for each event
-        dot_size = 8
-        dot_spacing = 10
+        num_events = len(events_to_show)
+        
+        # Dynamic sizing: fewer events = bigger dots
+        if num_events <= 1:
+            dot_size = 12
+            dot_spacing = 14
+        elif num_events <= 2:
+            dot_size = 10
+            dot_spacing = 12
+        else:
+            dot_size = 8
+            dot_spacing = 10
         current_x = x
         current_y = y
 
