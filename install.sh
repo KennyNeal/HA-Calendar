@@ -60,7 +60,7 @@ echo "[6/8] Installing Python dependencies..."
 pip install -r requirements.txt
 
 # Install Waveshare e-Paper library if not already installed
-echo "[7/8] Installing Waveshare e-Paper library..."
+echo "[7/9] Installing Waveshare e-Paper library..."
 if [ ! -d "waveshare_epd" ]; then
     echo "Downloading Waveshare e-Paper library..."
     git clone https://github.com/waveshare/e-Paper.git waveshare_epd_repo
@@ -71,8 +71,27 @@ else
     echo "Waveshare library already installed"
 fi
 
+# Install Weather Icons font
+echo "[8/9] Installing Weather Icons font..."
+FONT_DIR="/usr/share/fonts/truetype/weather-icons"
+if [ ! -f "$FONT_DIR/weathericons-regular-webfont.ttf" ]; then
+    sudo mkdir -p "$FONT_DIR"
+    echo "Downloading Weather Icons font..."
+    sudo wget -q -O "$FONT_DIR/weathericons-regular-webfont.ttf" \
+        "https://github.com/erikflowers/weather-icons/raw/master/font/weathericons-regular-webfont.ttf"
+    if [ $? -eq 0 ]; then
+        echo "Updating font cache..."
+        sudo fc-cache -f -v > /dev/null 2>&1
+        echo "Weather Icons font installed successfully"
+    else
+        echo "Warning: Failed to download Weather Icons font (continuing without it)"
+    fi
+else
+    echo "Weather Icons font already installed"
+fi
+
 # Create configuration file if it doesn't exist
-echo "[8/8] Setting up configuration..."
+echo "[9/9] Setting up configuration..."
 if [ ! -f "config/config.yaml" ]; then
     cp config/config.example.yaml config/config.yaml
     echo "Created config/config.yaml from example"

@@ -48,8 +48,10 @@ class BaseRenderer:
         font_paths = [
             '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
             '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/truetype/weather-icons/weathericons-regular-webfont.ttf',
             'C:/Windows/Fonts/arial.ttf',  # Windows fallback
-            'C:/Windows/Fonts/arialbd.ttf'
+            'C:/Windows/Fonts/arialbd.ttf',
+            'C:/Windows/Fonts/weathericons-regular-webfont.ttf'  # Windows weather icons
         ]
 
         fonts = {}
@@ -62,13 +64,35 @@ class BaseRenderer:
                 fonts['medium'] = ImageFont.truetype(font_paths[0], 16)  # Increased from 14
                 fonts['large'] = ImageFont.truetype(font_paths[1], 20)  # Increased from 18
                 fonts['xlarge'] = ImageFont.truetype(font_paths[1], 26)  # Increased from 24
+                
+                # Try to load weather icons font
+                if os.path.exists(font_paths[2]):
+                    fonts['weather_small'] = ImageFont.truetype(font_paths[2], 20)
+                    fonts['weather_medium'] = ImageFont.truetype(font_paths[2], 28)
+                    fonts['weather_large'] = ImageFont.truetype(font_paths[2], 36)
+                else:
+                    self.logger.warning("Weather Icons font not found, weather icons may not render correctly")
+                    fonts['weather_small'] = fonts['normal']
+                    fonts['weather_medium'] = fonts['medium']
+                    fonts['weather_large'] = fonts['large']
             # Try Arial fonts (Windows)
-            elif os.path.exists(font_paths[2]):
-                fonts['small'] = ImageFont.truetype(font_paths[2], 12)
-                fonts['normal'] = ImageFont.truetype(font_paths[2], 14)
-                fonts['medium'] = ImageFont.truetype(font_paths[2], 16)
-                fonts['large'] = ImageFont.truetype(font_paths[3], 20)
-                fonts['xlarge'] = ImageFont.truetype(font_paths[3], 26)
+            elif os.path.exists(font_paths[3]):
+                fonts['small'] = ImageFont.truetype(font_paths[3], 12)
+                fonts['normal'] = ImageFont.truetype(font_paths[3], 14)
+                fonts['medium'] = ImageFont.truetype(font_paths[3], 16)
+                fonts['large'] = ImageFont.truetype(font_paths[4], 20)
+                fonts['xlarge'] = ImageFont.truetype(font_paths[4], 26)
+                
+                # Try to load weather icons font (Windows)
+                if os.path.exists(font_paths[5]):
+                    fonts['weather_small'] = ImageFont.truetype(font_paths[5], 20)
+                    fonts['weather_medium'] = ImageFont.truetype(font_paths[5], 28)
+                    fonts['weather_large'] = ImageFont.truetype(font_paths[5], 36)
+                else:
+                    self.logger.warning("Weather Icons font not found, weather icons may not render correctly")
+                    fonts['weather_small'] = fonts['normal']
+                    fonts['weather_medium'] = fonts['medium']
+                    fonts['weather_large'] = fonts['large']
             else:
                 # Use default fonts
                 self.logger.warning("System fonts not found, using default fonts")
@@ -77,6 +101,9 @@ class BaseRenderer:
                 fonts['medium'] = ImageFont.load_default()
                 fonts['large'] = ImageFont.load_default()
                 fonts['xlarge'] = ImageFont.load_default()
+                fonts['weather_small'] = ImageFont.load_default()
+                fonts['weather_medium'] = ImageFont.load_default()
+                fonts['weather_large'] = ImageFont.load_default()
         except Exception as e:
             self.logger.error(f"Error loading fonts: {e}. Using defaults.")
             fonts['small'] = ImageFont.load_default()
@@ -84,6 +111,9 @@ class BaseRenderer:
             fonts['medium'] = ImageFont.load_default()
             fonts['large'] = ImageFont.load_default()
             fonts['xlarge'] = ImageFont.load_default()
+            fonts['weather_small'] = ImageFont.load_default()
+            fonts['weather_medium'] = ImageFont.load_default()
+            fonts['weather_large'] = ImageFont.load_default()
 
         return fonts
 
@@ -254,12 +284,16 @@ class BaseRenderer:
         if weather_info:
             from weather_data import WeatherDataProcessor
             weather_processor = WeatherDataProcessor()
-            weather_text = weather_processor.format_weather_text(weather_info)
+            weather_text = weather_processor.format_weather_with_icon(weather_info)
+            
+            # Use weather icon font if available, otherwise fallback
+            weather_font = self.fonts.get('weather_medium', self.fonts['medium'])
+            
             # Calculate position from right edge
-            bbox = draw.textbbox((0, 0), weather_text, font=self.fonts['medium'])
+            bbox = draw.textbbox((0, 0), weather_text, font=weather_font)
             weather_width = bbox[2] - bbox[0]
             weather_x = self.width - 20 - weather_width
-            self.draw_text(draw, weather_text, weather_x, text_y + 4, self.fonts['medium'], self.white)
+            self.draw_text(draw, weather_text, weather_x, text_y + 2, weather_font, self.white)
 
         # Draw separator line
         draw.line([(0, height), (self.width, height)], fill=self.black, width=2)
