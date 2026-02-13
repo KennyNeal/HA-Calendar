@@ -37,7 +37,7 @@ class TwoWeekRenderer(BaseRenderer):
 
         # Calculate grid dimensions
         # Layout: 2 rows (weeks) x 7 columns (days)
-        footer_height = 0  # No footer needed
+        footer_height = 40  # Footer with last updated time
         available_height = self.height - header_height - footer_height
         row_height = available_height // 2
         col_width = self.width // 7
@@ -52,6 +52,9 @@ class TwoWeekRenderer(BaseRenderer):
         # Draw week 2 (next week)
         week2_start = week1_start + timedelta(days=7)
         self._draw_week_row(draw, week2_start, y + row_height, row_height, col_width, events_by_day)
+
+        # Draw footer with last updated time
+        self.draw_footer(draw, y + available_height, footer_height)
 
         # Legend removed - calendar colors are self-explanatory
 

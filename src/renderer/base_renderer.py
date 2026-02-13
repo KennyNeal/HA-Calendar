@@ -340,6 +340,37 @@ class BaseRenderer:
 
         return height
 
+    def draw_footer(self, draw, y_start, height=40):
+        """
+        Draw footer with last updated time.
+
+        Args:
+            draw: ImageDraw object
+            y_start: Y coordinate where footer starts
+            height: Footer height in pixels (default 40)
+
+        Returns:
+            int: Y coordinate where footer ends
+        """
+        footer_y = y_start
+        
+        # Draw separator line above footer
+        draw.line([(0, footer_y), (self.width, footer_y)], fill=self.black, width=2)
+
+        # Draw footer background (light gray or white)
+        self.draw_box(draw, 0, footer_y, self.width, height, fill=self.white, outline=self.black, outline_width=1)
+
+        # Calculate vertical centering
+        text_y = footer_y + (height - 14) // 2  # Center normal font (14px) vertically
+
+        # Draw "Last Updated:" label and timestamp
+        last_updated = datetime.now().strftime("%I:%M %p")
+        updated_text = f"Last Updated: {last_updated}"
+        
+        self.draw_text(draw, updated_text, 20, text_y, self.fonts['normal'], self.black)
+
+        return footer_y + height
+
     def draw_legend(self, draw, y_start, calendars):
         """
         Draw calendar legend.

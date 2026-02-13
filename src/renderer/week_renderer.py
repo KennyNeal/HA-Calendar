@@ -37,7 +37,7 @@ class WeekRenderer(BaseRenderer):
 
         # Calculate grid dimensions
         # Layout: 1 row (week) x 7 columns (days) with larger cells
-        footer_height = 0  # No footer needed
+        footer_height = 40  # Footer with last updated time
         available_height = self.height - header_height - footer_height
         row_height = available_height
         col_width = self.width // 7
@@ -48,6 +48,9 @@ class WeekRenderer(BaseRenderer):
 
         # Draw week row
         self._draw_week_row(draw, week_start, y, row_height, col_width, events_by_day)
+
+        # Draw footer with last updated time
+        self.draw_footer(draw, y + row_height, footer_height)
 
         # Legend removed - calendar colors are self-explanatory
 

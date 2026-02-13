@@ -38,7 +38,7 @@ class MonthRenderer(BaseRenderer):
 
         # Calculate grid dimensions
         # Layout: Up to 6 rows (weeks) x 7 columns (days)
-        footer_height = 0  # No footer needed
+        footer_height = 40  # Footer with last updated time
         available_height = self.height - header_height - footer_height
         row_height = available_height // 6
         col_width = self.width // 7
@@ -91,6 +91,9 @@ class MonthRenderer(BaseRenderer):
                 )
 
                 current_date += timedelta(days=1)
+
+        # Draw footer with last updated time
+        self.draw_footer(draw, header_height + available_height, footer_height)
 
         # Legend removed - calendar colors are self-explanatory
 

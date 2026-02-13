@@ -36,7 +36,7 @@ class AgendaRenderer(BaseRenderer):
         y = self.draw_header(draw, weather_info, header_height)
 
         # Calculate available space
-        footer_height = 0  # No footer needed
+        footer_height = 40  # Footer with last updated time
         available_height = self.height - header_height - footer_height
         content_y = y + 10
 
@@ -150,6 +150,9 @@ class AgendaRenderer(BaseRenderer):
 
             # Add spacing between days
             content_y += 10
+
+        # Draw footer with last updated time
+        self.draw_footer(draw, self.height - footer_height, footer_height)
 
         # Legend removed - calendar colors are self-explanatory
 
