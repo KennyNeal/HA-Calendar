@@ -284,16 +284,33 @@ class BaseRenderer:
         if weather_info:
             from weather_data import WeatherDataProcessor
             weather_processor = WeatherDataProcessor()
-            weather_text = weather_processor.format_weather_with_icon(weather_info)
             
-            # Use weather icon font if available, otherwise fallback
-            weather_font = self.fonts.get('weather_medium', self.fonts['medium'])
+            # Get icon and temperature separately
+            icon = weather_processor.get_weather_icon(weather_info.condition.lower())
+            temp_str = f"{weather_info.temperature:.0f}{weather_info.temperature_unit}"
             
-            # Calculate position from right edge
-            bbox = draw.textbbox((0, 0), weather_text, font=weather_font)
-            weather_width = bbox[2] - bbox[0]
-            weather_x = self.width - 20 - weather_width
-            self.draw_text(draw, weather_text, weather_x, text_y + 2, weather_font, self.white)
+            # Use weather icon font for icon, regular font for temperature
+            weather_icon_font = self.fonts.get('weather_medium', self.fonts['medium'])
+            temp_font = self.fonts['medium']
+            
+            # Calculate position from right edge (measure temperature first for positioning)
+            temp_bbox = draw.textbbox((0, 0), temp_str, font=temp_font)
+            temp_width = temp_bbox[2] - temp_bbox[0]
+            
+            # Measure icon width
+            icon_bbox = draw.textbbox((0, 0), icon, font=weather_icon_font)
+            icon_width = icon_bbox[2] - icon_bbox[0]
+            
+            # Position from right edge (icon + space + temp)
+            total_width = icon_width + 8 + temp_width  # 8 pixels for space
+            weather_x = self.width - 20 - total_width
+            
+            # Draw icon first
+            self.draw_text(draw, icon, weather_x, text_y, weather_icon_font, self.white)
+            
+            # Draw temperature to the right of icon
+            temp_x = weather_x + icon_width + 8  # 8 pixel gap
+            self.draw_text(draw, temp_str, temp_x, text_y + 4, temp_font, self.white)
 
         # Draw separator line
         draw.line([(0, height), (self.width, height)], fill=self.black, width=2)
