@@ -364,7 +364,7 @@ class BaseRenderer:
         text_y = footer_y + (height - 14) // 2  # Center normal font (14px) vertically
 
         # Draw "Last Updated:" label and timestamp
-        last_updated = datetime.now().strftime("%d/%m %I:%M %p")
+        last_updated = datetime.now().strftime("%m/%d %I:%M %p")
         updated_text = f"Last Updated: {last_updated}"
         
         self.draw_text(draw, updated_text, 20, text_y, self.fonts['normal'], self.black)
