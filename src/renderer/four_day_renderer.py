@@ -37,7 +37,7 @@ class FourDayRenderer(BaseRenderer):
 
         # Calculate column dimensions
         # Layout: 4 columns (4 days)
-        footer_height = 0  # No footer needed
+        footer_height = 40  # Footer with last updated time
         available_height = self.height - header_height - footer_height
         col_width = self.width // 4
 
@@ -60,6 +60,9 @@ class FourDayRenderer(BaseRenderer):
                 events_by_day.get(current_date),
                 is_today
             )
+
+        # Draw footer with last updated time
+        self.draw_footer(draw, y + available_height, footer_height)
 
         self.logger.info("Rendered 4-day view")
         return image
