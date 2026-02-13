@@ -342,7 +342,7 @@ class BaseRenderer:
 
     def draw_footer(self, draw, y_start, height=40):
         """
-        Draw footer with last updated time.
+        Draw footer with last updated date and time.
 
         Args:
             draw: ImageDraw object
@@ -364,7 +364,7 @@ class BaseRenderer:
         text_y = footer_y + (height - 14) // 2  # Center normal font (14px) vertically
 
         # Draw "Last Updated:" label and timestamp
-        last_updated = datetime.now().strftime("%I:%M %p")
+        last_updated = datetime.now().strftime("%d/%m %I:%M %p")
         updated_text = f"Last Updated: {last_updated}"
         
         self.draw_text(draw, updated_text, 20, text_y, self.fonts['normal'], self.black)
