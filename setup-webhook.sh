@@ -5,9 +5,37 @@ set -e
 
 echo "Setting up HA Calendar webhook server..."
 
+# Get the actual user (not root if running with sudo)
+ACTUAL_USER=${SUDO_USER:-$USER}
+
+# Generate systemd service file with deployment-specific paths
+DEPLOYMENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="$DEPLOYMENT_DIR/src/main.py"
+SERVICE_FILE="$DEPLOYMENT_DIR/ha-calendar-webhook.service"
+
+echo "Generating service file for deployment at: $DEPLOYMENT_DIR"
+echo "Service will run as user: $ACTUAL_USER"
+cat > "$SERVICE_FILE" << EOF
+[Unit]
+Description=HA Calendar Webhook Server
+After=network.target
+
+[Service]
+Type=simple
+User=$ACTUAL_USER
+WorkingDirectory=$DEPLOYMENT_DIR
+Environment="CALENDAR_SCRIPT_PATH=$SCRIPT_PATH"
+ExecStart=$DEPLOYMENT_DIR/venv/bin/python3 $DEPLOYMENT_DIR/src/webhook_server.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 # Copy systemd service file
 echo "Installing systemd service..."
-sudo cp ha-calendar-webhook.service /etc/systemd/system/
+sudo cp "$SERVICE_FILE" /etc/systemd/system/
 sudo systemctl daemon-reload
 
 # Enable and start the service

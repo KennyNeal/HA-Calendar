@@ -108,6 +108,33 @@ fi
 # Create logs directory
 mkdir -p logs
 
+# Generate systemd service file with deployment-specific paths
+echo "[10/10] Generating systemd service file..."
+DEPLOYMENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="$DEPLOYMENT_DIR/src/main.py"
+SERVICE_FILE="ha-calendar-webhook.service"
+
+cat > "$SERVICE_FILE" << EOF
+[Unit]
+Description=HA Calendar Webhook Server
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$DEPLOYMENT_DIR
+Environment="CALENDAR_SCRIPT_PATH=$SCRIPT_PATH"
+ExecStart=$DEPLOYMENT_DIR/venv/bin/python3 $DEPLOYMENT_DIR/src/webhook_server.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Service file generated: $SERVICE_FILE"
+echo "Run './setup-webhook.sh' to install the webhook server"
+
 echo ""
 echo "================================================"
 echo "Installation Complete!"
@@ -140,11 +167,14 @@ echo ""
 echo "6. To test with actual hardware, edit config/config.yaml:"
 echo "   Set mock_mode: false under display settings"
 echo ""
-echo "7. Set up cron job for hourly updates:"
+echo "7. Set up webhook server for remote calendar updates:"
+echo "   sudo ./setup-webhook.sh"
+echo ""
+echo "8. Set up cron job for hourly updates:"
 echo "   crontab -e"
 echo "   Add: 0 * * * * cd $(pwd) && $(pwd)/venv/bin/python3 src/main.py >> logs/cron.log 2>&1"
 echo ""
-echo "8. To set up required Home Assistant entities:"
+echo "9. To set up required Home Assistant entities:"
 echo "   - Create input_select.calendar_view with options:"
 echo "     two_week, month, week, agenda"
 echo "   - Ensure calendar.family and calendar.prairieville_high_school_football exist"
