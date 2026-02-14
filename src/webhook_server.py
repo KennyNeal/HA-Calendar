@@ -136,15 +136,28 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
 def run_server(port=8765):
     """Run the webhook server."""
-    server_address = ('', port)
-    httpd = HTTPServer(server_address, WebhookHandler)
+    # Bind explicitly to all interfaces to avoid ambiguity between
+    # IPv4/IPv6 or platform-specific behavior.
+    server_address = ('0.0.0.0', port)
+
+    try:
+        httpd = HTTPServer(server_address, WebhookHandler)
+    except Exception as e:
+        logger.error(f"Failed to start HTTP server on {server_address}: {e}")
+        print(f"Failed to start webhook server: {e}")
+        return
+
     logger.info(f"Starting webhook server on port {port}")
     print(f"Webhook server running on port {port}")
     print(f"Endpoint: http://<raspberry-pi-ip>:{port}/refresh")
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         logger.info("Shutting down webhook server")
+        httpd.shutdown()
+    except Exception as e:
+        logger.error(f"Server runtime error: {e}")
         httpd.shutdown()
 
 
