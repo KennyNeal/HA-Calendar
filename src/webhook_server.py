@@ -27,6 +27,9 @@ DISPLAY_PATH = os.path.join(DEPLOYMENT_DIR, 'calendar_display.png')
 def get_config():
     """Load the current configuration."""
     try:
+        if not os.path.exists(CONFIG_PATH):
+            logger.warning(f"Config file not found at: {CONFIG_PATH}")
+            return None
         with open(CONFIG_PATH, 'r') as f:
             return yaml.safe_load(f)
     except Exception as e:
@@ -38,16 +41,24 @@ def get_display_format():
     """Get the current display format from config."""
     config = get_config()
     if config and 'display' in config:
-        return config['display'].get('view', 'unknown')
+        view = config['display'].get('view')
+        if view:
+            logger.info(f"Display format: {view}")
+            return view
+    logger.warning(f"Could not determine display format. Config: {config}")
     return 'unknown'
 
 
 def get_last_update_time():
     """Get the last update time from the display file."""
     try:
-        if os.path.exists(DISPLAY_PATH):
-            mtime = os.path.getmtime(DISPLAY_PATH)
-            return datetime.fromtimestamp(mtime).isoformat()
+        if not os.path.exists(DISPLAY_PATH):
+            logger.warning(f"Display file not found at: {DISPLAY_PATH}")
+            return None
+        mtime = os.path.getmtime(DISPLAY_PATH)
+        timestamp = datetime.fromtimestamp(mtime).isoformat()
+        logger.info(f"Last update: {timestamp}")
+        return timestamp
     except Exception as e:
         logger.error(f"Failed to get display file time: {e}")
     return None
