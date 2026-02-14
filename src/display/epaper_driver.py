@@ -50,9 +50,11 @@ class EPaperDisplay:
         try:
             import sys
             # Add waveshare lib path (adjust as needed based on installation)
-            lib_path = os.path.join(os.path.dirname(__file__), '../../waveshare_epd')
+            lib_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '../../waveshare_epd'))
             if os.path.exists(lib_path):
-                sys.path.append(lib_path)
+                # Append the parent directory so `import waveshare_epd` will find
+                # the package directory named `waveshare_epd` within it.
+                sys.path.append(os.path.dirname(lib_path))
 
             from waveshare_epd import epd7in3e
 
