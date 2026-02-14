@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """Simple webhook server to trigger calendar display updates."""
 
+import os
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from utils.logger import get_logger
 
 logger = get_logger()
+
+# Get the calendar script path from environment variable
+CALENDAR_SCRIPT_PATH = os.environ.get(
+    'CALENDAR_SCRIPT_PATH',
+    os.path.join(os.path.dirname(__file__), '..', 'src', 'main.py')
+)
 
 class WebhookHandler(BaseHTTPRequestHandler):
     """Handle webhook requests to trigger calendar updates."""
@@ -19,7 +26,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             try:
                 # Run the calendar update script
                 result = subprocess.run(
-                    ['sudo', sys.executable, '/home/kenny/HA-Calendar/src/main.py'],
+                    ['sudo', sys.executable, CALENDAR_SCRIPT_PATH],
                     capture_output=True,
                     text=True,
                     timeout=120
