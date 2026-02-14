@@ -1,6 +1,7 @@
 """E-paper display driver for Waveshare 7.3" HAT (E)."""
 
 import os
+from pathlib import Path
 from PIL import Image
 from utils.logger import get_logger
 
@@ -149,9 +150,16 @@ class EPaperDisplay:
         if self.mock_mode:
             # Save to file instead of displaying on hardware
             # Convert to RGB for saving as PNG
-            output_path = 'calendar_display.png'
-            quantized_image.convert('RGB').save(output_path)
-            self.logger.info(f"Mock mode: Saved image to {output_path}")
+            # Save predictable path in repository root so webhook and
+            # other tools can consistently find the latest image even
+            # when the script runs under sudo with a different CWD.
+            repo_root = Path(__file__).resolve().parents[2]
+            output_path = repo_root / 'calendar_display.png'
+            try:
+                quantized_image.convert('RGB').save(str(output_path))
+                self.logger.info(f"Mock mode: Saved image to {output_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to save mock image to {output_path}: {e}")
         else:
             try:
                 self.logger.info("Sending image to e-paper display...")
