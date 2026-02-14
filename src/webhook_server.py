@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Simple webhook server to trigger calendar display updates."""
 
+import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from utils.logger import get_logger
+import yaml
 
 logger = get_logger()
 
@@ -14,6 +17,40 @@ CALENDAR_SCRIPT_PATH = os.environ.get(
     'CALENDAR_SCRIPT_PATH',
     os.path.join(os.path.dirname(__file__), '..', 'src', 'main.py')
 )
+
+# Get deployment directory
+DEPLOYMENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_PATH = os.path.join(DEPLOYMENT_DIR, 'config', 'config.yaml')
+DISPLAY_PATH = os.path.join(DEPLOYMENT_DIR, 'calendar_display.png')
+
+
+def get_config():
+    """Load the current configuration."""
+    try:
+        with open(CONFIG_PATH, 'r') as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        logger.error(f"Failed to read config: {e}")
+        return None
+
+
+def get_display_format():
+    """Get the current display format from config."""
+    config = get_config()
+    if config and 'display' in config:
+        return config['display'].get('view', 'unknown')
+    return 'unknown'
+
+
+def get_last_update_time():
+    """Get the last update time from the display file."""
+    try:
+        if os.path.exists(DISPLAY_PATH):
+            mtime = os.path.getmtime(DISPLAY_PATH)
+            return datetime.fromtimestamp(mtime).isoformat()
+    except Exception as e:
+        logger.error(f"Failed to get display file time: {e}")
+    return None
 
 class WebhookHandler(BaseHTTPRequestHandler):
     """Handle webhook requests to trigger calendar updates."""
@@ -64,10 +101,19 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         """Handle GET requests for health checks."""
         if self.path == '/health':
+            display_format = get_display_format()
+            last_update = get_last_update_time()
+            
+            health_data = {
+                'status': 'ok',
+                'display_format': display_format,
+                'last_update': last_update
+            }
+            
             self.send_response(200)
-            self.send_header('Content-type', 'text/plain')
+            self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(b'OK')
+            self.wfile.write(json.dumps(health_data).encode())
         else:
             self.send_response(404)
             self.end_headers()
