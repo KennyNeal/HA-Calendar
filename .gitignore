@@ -1,6 +1,9 @@
 # Configuration files with secrets
 config/config.yaml
 
+# Generated service files (created by install.sh)
+ha-calendar-webhook.service
+
 # Temporary Claude files
 tmpclaude*
 
