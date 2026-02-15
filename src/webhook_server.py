@@ -15,13 +15,16 @@ logger = get_logger()
 # Get the calendar script path from environment variable
 CALENDAR_SCRIPT_PATH = os.environ.get(
     'CALENDAR_SCRIPT_PATH',
-    os.path.join(os.path.dirname(__file__), '..', 'src', 'main.py')
+    os.path.join(os.path.dirname(__file__), 'main.py')
 )
 
 # Get deployment directory
 DEPLOYMENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(DEPLOYMENT_DIR, 'config', 'config.yaml')
 DISPLAY_PATH = os.path.join(DEPLOYMENT_DIR, 'calendar_display.png')
+
+# Get venv python path
+VENV_PYTHON = os.path.join(DEPLOYMENT_DIR, 'venv', 'bin', 'python3')
 
 
 def get_config():
@@ -72,12 +75,16 @@ class WebhookHandler(BaseHTTPRequestHandler):
             logger.info("Webhook received: Triggering calendar refresh")
 
             try:
-                # Run the calendar update script
+                # Use venv Python if available, otherwise system Python
+                python_cmd = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
+                
+                # Run the calendar update script (no sudo needed)
                 result = subprocess.run(
-                    ['sudo', sys.executable, CALENDAR_SCRIPT_PATH],
+                    [python_cmd, CALENDAR_SCRIPT_PATH],
                     capture_output=True,
                     text=True,
-                    timeout=120
+                    timeout=120,
+                    cwd=DEPLOYMENT_DIR
                 )
 
                 if result.returncode == 0:
@@ -86,12 +93,15 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(b'Calendar refresh triggered successfully')
                     logger.info("Calendar refresh completed successfully")
+                    if result.stdout:
+                        logger.debug(f"Output: {result.stdout}")
                 else:
                     self.send_response(500)
                     self.send_header('Content-type', 'text/plain')
                     self.end_headers()
-                    self.wfile.write(f'Error: {result.stderr}'.encode())
-                    logger.error(f"Calendar refresh failed: {result.stderr}")
+                    error_msg = result.stderr or result.stdout or 'Unknown error'
+                    self.wfile.write(f'Error: {error_msg}'.encode())
+                    logger.error(f"Calendar refresh failed (code {result.returncode}): {error_msg}")
 
             except subprocess.TimeoutExpired:
                 self.send_response(500)
@@ -104,7 +114,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 self.send_header('Content-type', 'text/plain')
                 self.end_headers()
                 self.wfile.write(f'Error: {str(e)}'.encode())
-                logger.error(f"Calendar refresh error: {e}")
+                logger.error(f"Calendar refresh error: {e}", exc_info=True)
         else:
             self.send_response(404)
             self.end_headers()
