@@ -145,10 +145,9 @@ class EPaperDisplay:
             )
             image = image.resize((self.display_config['width'], self.display_config['height']))
 
-        # Quantize to e-paper colors
-        quantized_image = self.quantize_image(image)
-
         if self.mock_mode:
+            # Quantize to e-paper colors for preview
+            quantized_image = self.quantize_image(image)
             # Save to file instead of displaying on hardware
             # Convert to RGB for saving as PNG
             output_path = 'calendar_display.png'
@@ -158,9 +157,9 @@ class EPaperDisplay:
             try:
                 self.logger.info("Sending image to e-paper display...")
 
-                # Convert PIL image to format expected by Waveshare library
-                # The Waveshare library expects a buffer in specific format
-                buffer = self._image_to_buffer(quantized_image)
+                # Use the Waveshare library's getbuffer() method
+                # It handles quantization and byte packing correctly for the hardware
+                buffer = self.epd.getbuffer(image)
 
                 # Display on e-paper
                 self.epd.display(buffer)
@@ -168,8 +167,8 @@ class EPaperDisplay:
 
             except Exception as e:
                 self.logger.error(f"Failed to display image: {e}")
-                # Save as backup (convert to RGB for debugging)
-                quantized_image.convert('RGB').save('calendar_display_error.png')
+                # Save as backup for debugging
+                image.save('calendar_display_error.png')
                 self.logger.info("Saved error backup to calendar_display_error.png")
 
     def _image_to_buffer(self, image):
