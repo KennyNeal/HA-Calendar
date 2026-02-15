@@ -144,15 +144,21 @@ class CalendarDataProcessor:
         events_by_day = defaultdict(list)
 
         for event in events:
-            event_date = event.start.date()
+            event_start = event.start.date()
+            event_end = event.end.date()
+            
+            # For multi-day events, add to each day they span
+            current_date = event_start
+            while current_date < event_end:
+                # Filter by date range if specified
+                if start_date and current_date < start_date:
+                    current_date += timedelta(days=1)
+                    continue
+                if end_date and current_date >= end_date:
+                    break
 
-            # Filter by date range if specified
-            if start_date and event_date < start_date:
-                continue
-            if end_date and event_date >= end_date:
-                continue
-
-            events_by_day[event_date].append(event)
+                events_by_day[current_date].append(event)
+                current_date += timedelta(days=1)
 
         # Convert to DayEvents objects
         day_events_dict = {}
