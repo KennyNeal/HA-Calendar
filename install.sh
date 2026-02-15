@@ -60,16 +60,15 @@ pip install --upgrade pip
 echo "[6/8] Installing Python dependencies..."
 pip install -r requirements.txt
 
-# Install Waveshare e-Paper library if not already installed
-echo "[7/9] Installing Waveshare e-Paper library..."
-if [ ! -d "waveshare_epd" ]; then
-    echo "Downloading Waveshare e-Paper library..."
-    git clone https://github.com/waveshare/e-Paper.git waveshare_epd_repo
-    cp -r waveshare_epd_repo/RaspberryPi_JetsonNano/python/lib/waveshare_epd ./
-    rm -rf waveshare_epd_repo
-    echo "Waveshare library installed"
+# Waveshare e-Paper library is included in the repository
+echo "[7/9] Checking Waveshare e-Paper library..."
+if [ -d "waveshare_epd" ]; then
+    echo "Waveshare library found in repository"
 else
-    echo "Waveshare library already installed"
+    echo "ERROR: waveshare_epd folder not found!"
+    echo "This should be included in the repository."
+    echo "If missing, run: git pull"
+    exit 1
 fi
 
 # Install Weather Icons font

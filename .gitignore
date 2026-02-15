@@ -9,6 +9,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+!waveshare_epd/*.so
 .Python
 build/
 develop-eggs/
