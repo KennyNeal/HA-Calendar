@@ -187,7 +187,7 @@ class FourDayRenderer(BaseRenderer):
 
             # Wrap text to fit in the bar
             # More lines allowed for longer events
-            max_text_lines = max(1, min(5, bar_height // line_height - 1))
+            max_text_lines = max(1, min(6, (bar_height - 4) // line_height))
             text_lines = self.wrap_text(event_text, width - 6, self.fonts[font_key], draw, max_lines=max_text_lines)
 
             # Check if this overlaps with previous events at the same time

@@ -231,24 +231,28 @@ class BaseRenderer:
         words = text.split(' ')
         lines = []
         current_line = ''
+        words_used = 0
 
-        for word in words:
+        for i, word in enumerate(words):
             test_line = current_line + (' ' if current_line else '') + word
             bbox = draw.textbbox((0, 0), test_line, font=font)
             test_width = bbox[2] - bbox[0]
 
             if test_width <= max_width:
                 current_line = test_line
+                words_used = i + 1
             else:
                 if current_line:
                     lines.append(current_line)
                     if len(lines) >= max_lines:
                         break
                     current_line = word
+                    words_used = i + 1
                 else:
                     # Single word is too long, truncate it
                     current_line = self.truncate_text(word, max_width, font, draw)
                     lines.append(current_line)
+                    words_used = i + 1
                     if len(lines) >= max_lines:
                         break
                     current_line = ''
@@ -256,10 +260,17 @@ class BaseRenderer:
         # Add remaining text if we haven't hit max lines
         if current_line and len(lines) < max_lines:
             lines.append(current_line)
+            words_used = len(words)
 
         # If we have more words and hit max lines, add ellipsis to last line
-        if len(lines) == max_lines and words[words.index(lines[-1].split()[-1]) + 1:]:
-            lines[-1] = self.truncate_text(lines[-1], max_width - 20, font, draw) + '...'
+        if lines and words_used < len(words):
+            # There are remaining words - add ellipsis
+            last_line = lines[-1]
+            ellipsis = '...'
+            # Make room for ellipsis
+            bbox = draw.textbbox((0, 0), ellipsis, font=font)
+            ellipsis_width = bbox[2] - bbox[0]
+            lines[-1] = self.truncate_text(last_line, max_width - ellipsis_width, font, draw) + ellipsis
 
         return lines
 
