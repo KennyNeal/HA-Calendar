@@ -32,12 +32,36 @@ sudo apt-get install -y git python3 python3-pip python3-venv python3-pil \
 
 # Enable SPI (required for e-paper display)
 echo "[3/8] Enabling SPI interface..."
-if ! grep -q "^dtparam=spi=on" /boot/config.txt; then
-    echo "dtparam=spi=on" | sudo tee -a /boot/config.txt
-    echo "SPI enabled (requires reboot to take effect)"
-    NEEDS_REBOOT=1
+
+# Determine config file location (varies by Pi OS version)
+if [ -f /boot/firmware/config.txt ]; then
+    CONFIG_FILE="/boot/firmware/config.txt"
+elif [ -f /boot/config.txt ]; then
+    CONFIG_FILE="/boot/config.txt"
 else
-    echo "SPI already enabled"
+    echo "WARNING: Could not find config.txt"
+    echo "Please enable SPI manually using: sudo raspi-config"
+    echo "Navigate to: 3 Interface Options -> I4 SPI -> Enable"
+    CONFIG_FILE=""
+fi
+
+if [ -n "$CONFIG_FILE" ]; then
+    if ! grep -q "^dtparam=spi=on" "$CONFIG_FILE"; then
+        echo "dtparam=spi=on" | sudo tee -a "$CONFIG_FILE"
+        echo "✓ SPI enabled in $CONFIG_FILE"
+        echo ""
+        echo "⚠️  IMPORTANT: You MUST reboot for SPI to take effect!"
+        echo ""
+        NEEDS_REBOOT=1
+    else
+        echo "✓ SPI already enabled in $CONFIG_FILE"
+        # Verify SPI device exists
+        if [ ! -e /dev/spidev0.0 ]; then
+            echo "⚠️  WARNING: SPI is in config but /dev/spidev0.0 doesn't exist"
+            echo "   A reboot is required to activate SPI"
+            NEEDS_REBOOT=1
+        fi
+    fi
 fi
 
 # Create virtual environment
@@ -163,8 +187,10 @@ echo "5. Test the display (mock mode):"
 echo "   python3 src/main.py"
 echo "   This will create calendar_display.png"
 echo ""
-echo "6. To test with actual hardware, edit config/config.yaml:"
-echo "   Set mock_mode: false under display settings"
+echo "6. To test with actual hardware:"
+echo "   a. Ensure SPI is enabled and working (verify /dev/spidev0.0 exists)"
+echo "   b. Edit config/config.yaml and set: mock_mode: false"
+echo "   c. Run: python3 src/main.py"
 echo ""
 echo "7. Set up webhook server for remote calendar updates:"
 echo "   sudo ./setup-webhook.sh"
@@ -181,11 +207,22 @@ echo "   - Ensure weather.forecast_home entity exists"
 echo ""
 
 if [ ! -z "$NEEDS_REBOOT" ]; then
-    echo "================================================"
-    echo "REBOOT REQUIRED"
-    echo "================================================"
-    echo "SPI interface was enabled. Please reboot your Raspberry Pi:"
+    echo ""
+    echo "========================================================================"
+    echo "⚠️  REBOOT REQUIRED - DISPLAY WILL NOT WORK WITHOUT REBOOT  ⚠️"
+    echo "========================================================================"
+    echo ""
+    echo "SPI interface was enabled and requires a reboot to take effect."
+    echo "The e-paper display CANNOT function without SPI enabled."
+    echo ""
+    echo "To reboot now, run:"
     echo "  sudo reboot"
+    echo ""
+    echo "After reboot, verify SPI is working with:"
+    echo "  ls -l /dev/spidev*"
+    echo ""
+    echo "You should see: /dev/spidev0.0 and /dev/spidev0.1"
+    echo "========================================================================"
     echo ""
 fi
 
