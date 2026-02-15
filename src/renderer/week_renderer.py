@@ -18,13 +18,14 @@ class WeekRenderer(BaseRenderer):
         super().__init__(config, color_manager)
         self.view_config = config['views']['week']
 
-    def render(self, events_by_day, weather_info):
+    def render(self, events_by_day, weather_info, footer_sensor_text=None):
         """
         Render single week view.
 
         Args:
             events_by_day: Dictionary mapping date to DayEvents
             weather_info: WeatherInfo object
+            footer_sensor_text: Optional sensor text for footer
 
         Returns:
             PIL.Image: Rendered calendar image
@@ -50,7 +51,7 @@ class WeekRenderer(BaseRenderer):
         self._draw_week_row(draw, week_start, y, row_height, col_width, events_by_day)
 
         # Draw footer with last updated time
-        self.draw_footer(draw, y + row_height, footer_height)
+        self.draw_footer(draw, y + row_height, footer_height, footer_sensor_text)
 
         # Legend removed - calendar colors are self-explanatory
 

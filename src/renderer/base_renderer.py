@@ -351,14 +351,15 @@ class BaseRenderer:
 
         return height
 
-    def draw_footer(self, draw, y_start, height=40):
+    def draw_footer(self, draw, y_start, height=40, footer_sensor_text=None):
         """
-        Draw footer with last updated date and time.
+        Draw footer with last updated date and time, and optional sensor value.
 
         Args:
             draw: ImageDraw object
             y_start: Y coordinate where footer starts
             height: Footer height in pixels (default 40)
+            footer_sensor_text: Optional text to display on right side (e.g., "Outdoor Scene: LSU")
 
         Returns:
             int: Y coordinate where footer ends
@@ -374,11 +375,18 @@ class BaseRenderer:
         # Calculate vertical centering
         text_y = footer_y + (height - 14) // 2  # Center normal font (14px) vertically
 
-        # Draw "Last Updated:" label and timestamp
+        # Draw "Last Updated:" label and timestamp on the left
         last_updated = datetime.now().strftime("%m/%d %I:%M %p")
         updated_text = f"Last Updated: {last_updated}"
         
         self.draw_text(draw, updated_text, 20, text_y, self.fonts['normal'], self.black)
+
+        # Draw optional sensor text on the right
+        if footer_sensor_text:
+            bbox = draw.textbbox((0, 0), footer_sensor_text, font=self.fonts['normal'])
+            text_width = bbox[2] - bbox[0]
+            right_x = self.width - text_width - 20
+            self.draw_text(draw, footer_sensor_text, right_x, text_y, self.fonts['normal'], self.black)
 
         return footer_y + height
 

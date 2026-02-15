@@ -18,13 +18,14 @@ class AgendaRenderer(BaseRenderer):
         super().__init__(config, color_manager)
         self.view_config = config['views']['agenda']
 
-    def render(self, events_by_day, weather_info):
+    def render(self, events_by_day, weather_info, footer_sensor_text=None):
         """
-        Render agenda/list view.
+        Render agenda list view.
 
         Args:
             events_by_day: Dictionary mapping date to DayEvents
             weather_info: WeatherInfo object
+            footer_sensor_text: Optional sensor text for footer
 
         Returns:
             PIL.Image: Rendered calendar image
@@ -152,7 +153,7 @@ class AgendaRenderer(BaseRenderer):
             content_y += 10
 
         # Draw footer with last updated time
-        self.draw_footer(draw, self.height - footer_height, footer_height)
+        self.draw_footer(draw, self.height - footer_height, footer_height, footer_sensor_text)
 
         # Legend removed - calendar colors are self-explanatory
 

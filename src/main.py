@@ -137,6 +137,23 @@ def main():
         weather_data = ha_client.get_weather()
         weather_info = weather_processor.parse_weather(weather_data)
 
+        # Fetch optional footer sensor
+        footer_sensor_text = None
+        if 'footer_sensor' in config and config['footer_sensor']:
+            footer_sensor_config = config['footer_sensor']
+            sensor_entity_id = footer_sensor_config.get('entity_id')
+            sensor_label = footer_sensor_config.get('label', 'Sensor')
+            
+            if sensor_entity_id:
+                try:
+                    logger.info(f"Fetching footer sensor: {sensor_entity_id}")
+                    sensor_data = ha_client.get_state(sensor_entity_id)
+                    sensor_value = sensor_data.get('state', 'Unknown')
+                    footer_sensor_text = f"{sensor_label}: {sensor_value}"
+                    logger.info(f"Footer sensor value: {footer_sensor_text}")
+                except Exception as e:
+                    logger.warning(f"Failed to fetch footer sensor {sensor_entity_id}: {e}")
+
         # Determine date range based on view
         today = datetime.now().date()
         if current_view == 'month':
@@ -203,7 +220,7 @@ def main():
 
         # Render calendar image
         logger.info("Rendering calendar image...")
-        image = renderer.render(events_by_day, weather_info)
+        image = renderer.render(events_by_day, weather_info, footer_sensor_text)
 
         # Initialize and update display
         logger.info("Initializing display...")

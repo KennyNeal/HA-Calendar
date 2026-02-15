@@ -25,6 +25,12 @@ calendars:
 weather:
   entity_id: "weather.forecast_home"
 
+# Optional footer sensor (e.g., outdoor scene, mode, etc.)
+# Displays on the right side of the footer as "Label: value"
+footer_sensor:
+  entity_id: "sensor.outdoor_scene"  # Set to null to disable
+  label: "Outdoor Scene"  # Label to display before the sensor value
+
 # View selector
 # This input_select entity determines which view to display
 view_selector:

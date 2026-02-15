@@ -19,13 +19,14 @@ class MonthRenderer(BaseRenderer):
         super().__init__(config, color_manager)
         self.view_config = config['views']['month']
 
-    def render(self, events_by_day, weather_info):
+    def render(self, events_by_day, weather_info, footer_sensor_text=None):
         """
         Render month calendar view.
 
         Args:
             events_by_day: Dictionary mapping date to DayEvents
             weather_info: WeatherInfo object
+            footer_sensor_text: Optional sensor text for footer
 
         Returns:
             PIL.Image: Rendered calendar image
@@ -93,7 +94,7 @@ class MonthRenderer(BaseRenderer):
                 current_date += timedelta(days=1)
 
         # Draw footer with last updated time
-        self.draw_footer(draw, header_height + available_height, footer_height)
+        self.draw_footer(draw, header_height + available_height, footer_height, footer_sensor_text)
 
         # Legend removed - calendar colors are self-explanatory
 
