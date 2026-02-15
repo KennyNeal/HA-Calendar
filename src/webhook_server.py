@@ -8,6 +8,7 @@ import sys
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from utils.logger import get_logger
+from utils.state_manager import load_state
 import yaml
 
 logger = get_logger()
@@ -38,33 +39,6 @@ def get_config():
     except Exception as e:
         logger.error(f"Failed to read config: {e}")
         return None
-
-
-def get_display_format():
-    """Get the current display format from config."""
-    config = get_config()
-    if config and 'display' in config:
-        view = config['display'].get('view')
-        if view:
-            logger.info(f"Display format: {view}")
-            return view
-    logger.warning(f"Could not determine display format. Config: {config}")
-    return 'unknown'
-
-
-def get_last_update_time():
-    """Get the last update time from the display file."""
-    try:
-        if not os.path.exists(DISPLAY_PATH):
-            logger.warning(f"Display file not found at: {DISPLAY_PATH}")
-            return None
-        mtime = os.path.getmtime(DISPLAY_PATH)
-        timestamp = datetime.fromtimestamp(mtime).isoformat()
-        logger.info(f"Last update: {timestamp}")
-        return timestamp
-    except Exception as e:
-        logger.error(f"Failed to get display file time: {e}")
-    return None
 
 class WebhookHandler(BaseHTTPRequestHandler):
     """Handle webhook requests to trigger calendar updates."""
@@ -122,14 +96,24 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         """Handle GET requests for health checks."""
         if self.path == '/health':
-            display_format = get_display_format()
-            last_update = get_last_update_time()
+            # Load state from file
+            state = load_state()
             
-            health_data = {
-                'status': 'ok',
-                'display_format': display_format,
-                'last_update': last_update
-            }
+            if state:
+                health_data = {
+                    'status': 'ok',
+                    'last_updated': state.get('last_updated'),
+                    'current_view': state.get('current_view'),
+                    'state_updated': state.get('state_updated')
+                }
+            else:
+                # No state file yet (first run)
+                health_data = {
+                    'status': 'no_state',
+                    'message': 'Display has not been updated yet',
+                    'last_updated': None,
+                    'current_view': None
+                }
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')

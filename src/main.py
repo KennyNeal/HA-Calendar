@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from utils.logger import setup_logger, get_logger
 from utils.color_manager import ColorManager
+from utils.state_manager import save_state
 from ha_client import HomeAssistantClient
 from calendar_data import CalendarDataProcessor
 from weather_data import WeatherDataProcessor
@@ -231,6 +232,12 @@ def main():
 
         # Put display to sleep to save power
         display.sleep()
+
+        # Save state for health endpoint
+        save_state(
+            last_updated=datetime.now().isoformat(),
+            current_view=current_view
+        )
 
         # Log completion
         elapsed = (datetime.now() - start_time).total_seconds()
