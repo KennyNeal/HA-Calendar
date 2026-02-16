@@ -54,3 +54,7 @@ Thumbs.db
 *.png
 !docs/*.png
 state.json
+
+# User images (keep folder, ignore contents)
+img/*
+!img/.gitkeep
