@@ -161,7 +161,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                             [python_cmd, PICTURE_SCRIPT_PATH],
                             capture_output=True,
                             text=True,
-                            timeout=30,
+                            timeout=60,  # Increase timeout for slow e-paper refresh
                             cwd=DEPLOYMENT_DIR
                         )
                         
