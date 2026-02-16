@@ -3,9 +3,14 @@
 import sys
 import os
 import yaml
-import fcntl
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # Windows
+    fcntl = None
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -274,18 +279,25 @@ def main():
 
 if __name__ == '__main__':
     # Use file locking to prevent concurrent display access
-    lock_file = '/tmp/ha-calendar.lock'
+    lock_file = os.path.join(tempfile.gettempdir(), 'ha-calendar.lock')
     lock_fd = None
 
     try:
         # Try to acquire lock
-        lock_fd = open(lock_file, 'w')
-        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_fd = open(lock_file, 'a+')
+        lock_fd.write('1')
+        lock_fd.flush()
+
+        if fcntl:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        elif os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
 
         # Lock acquired, run main
         main()
 
-    except IOError:
+    except OSError:
         # Could not acquire lock - another instance is running
         print("Another calendar update is already running. Exiting.")
         sys.exit(0)
@@ -293,7 +305,11 @@ if __name__ == '__main__':
         # Release lock
         if lock_fd:
             try:
-                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                if fcntl:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                elif os.name == 'nt':
+                    import msvcrt
+                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
                 lock_fd.close()
             except:
                 pass

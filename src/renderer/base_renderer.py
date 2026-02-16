@@ -2,7 +2,7 @@
 
 from PIL import Image, ImageDraw, ImageFont
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils.logger import get_logger
 
 
@@ -432,3 +432,96 @@ class BaseRenderer:
             PIL.Image: Rendered image
         """
         raise NotImplementedError("Subclasses must implement render method")
+
+    def _event_key(self, event):
+        return (
+            event.calendar_id,
+            event.title,
+            event.start.isoformat(),
+            event.end.isoformat()
+        )
+
+    def _get_all_day_span_lanes(self, dates, events_by_day, max_lanes=3):
+        row_start = dates[0]
+        row_end = dates[-1]
+        span_events = {}
+
+        for day in dates:
+            day_events = events_by_day.get(day)
+            if not day_events:
+                continue
+
+            for event in day_events.events:
+                if not event.all_day:
+                    continue
+
+                end_inclusive = event.end.date() - timedelta(days=1)
+                if end_inclusive <= event.start.date():
+                    continue
+
+                if end_inclusive < row_start or event.start.date() > row_end:
+                    continue
+
+                span_events[self._event_key(event)] = event
+
+        spans = []
+        for event in span_events.values():
+            start_date = event.start.date()
+            end_inclusive = event.end.date() - timedelta(days=1)
+            span_start = max(start_date, row_start)
+            span_end = min(end_inclusive, row_end)
+            start_idx = dates.index(span_start)
+            end_idx = dates.index(span_end)
+            spans.append((start_idx, end_idx, event))
+
+        spans.sort(key=lambda s: (s[0], (s[1] - s[0]), s[2].title))
+
+        lanes = []
+        overflow = 0
+
+        for span in spans:
+            placed = False
+            for lane in lanes:
+                if all(span[1] < existing[0] or span[0] > existing[1] for existing in lane):
+                    lane.append(span)
+                    placed = True
+                    break
+
+            if not placed:
+                if len(lanes) < max_lanes:
+                    lanes.append([span])
+                else:
+                    overflow += 1
+
+        return lanes, overflow, set(span_events.keys())
+
+    def _draw_all_day_spans(self, draw, y, col_width, lanes, lane_height):
+        if not lanes:
+            return
+
+        line_height = 14
+        font = self.fonts['small']
+
+        for lane_idx, lane in enumerate(lanes):
+            lane_y = y + lane_idx * lane_height
+            for start_idx, end_idx, event in lane:
+                span_x = start_idx * col_width + 2
+                span_width = (end_idx - start_idx + 1) * col_width - 4
+
+                self.draw_box(draw, span_x, lane_y, span_width, lane_height - 2, fill=event.color)
+
+                text_lines = self.wrap_text(
+                    event.title,
+                    span_width - 6,
+                    font,
+                    draw,
+                    max_lines=2
+                )
+
+                total_text_height = len(text_lines) * line_height
+                text_y = lane_y + max(2, (lane_height - total_text_height) // 2)
+                text_center_x = span_x + (span_width // 2)
+
+                for line in text_lines:
+                    self.draw_text(draw, line, text_center_x, text_y, font, self.white, align='center')
+                    text_y += line_height

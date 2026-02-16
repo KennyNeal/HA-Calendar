@@ -36,6 +36,7 @@ footer_sensor:
 view_selector:
   entity_id: "input_select.calendar_view"
   default_view: "two_week"  # fallback if entity unavailable (two_week, month, week, agenda)
+  override_view: null  # Optional local override (two_week, four_day, month, week, agenda)
 
 # Display settings
 display:

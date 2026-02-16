@@ -73,6 +73,14 @@ class WeekRenderer(BaseRenderer):
         day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         today = date.today()
 
+        row_dates = [week_start + timedelta(days=i) for i in range(7)]
+        lanes, overflow, span_keys = self._get_all_day_span_lanes(row_dates, events_by_day, max_lanes=3)
+        lane_height = 18
+        all_day_height = lane_height * len(lanes)
+
+        all_day_top = y + 40
+        self._draw_all_day_spans(draw, all_day_top, col_width, lanes, lane_height)
+
         for i in range(7):
             current_date = week_start + timedelta(days=i)
             x = i * col_width
@@ -88,10 +96,12 @@ class WeekRenderer(BaseRenderer):
                 current_date,
                 day_names[i],
                 events_by_day.get(current_date),
-                is_today
+                is_today,
+                all_day_height,
+                span_keys
             )
 
-    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_name, day_events, is_today):
+    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_name, day_events, is_today, all_day_height, span_keys):
         """
         Draw a single day cell for week view.
 
@@ -120,13 +130,14 @@ class WeekRenderer(BaseRenderer):
             self._draw_events_in_cell(
                 draw,
                 x + padding,
-                y + 40,  # Start below the date header
+                y + 40 + all_day_height,  # Start below the date header and all-day spans
                 width - (2 * padding),
-                height - 45,
-                day_events
+                height - 45 - all_day_height,
+                day_events,
+                span_keys
             )
 
-    def _draw_events_in_cell(self, draw, x, y, width, height, day_events):
+    def _draw_events_in_cell(self, draw, x, y, width, height, day_events, span_keys):
         """
         Draw events within a cell with time-based vertical positioning.
         Event heights are proportional to their duration.
@@ -142,7 +153,8 @@ class WeekRenderer(BaseRenderer):
         max_events = self.view_config.get('max_events_per_day', 5)
         show_time = self.view_config.get('show_time', True)
 
-        events_to_show = day_events.events[:max_events]
+        filtered_events = [event for event in day_events.events if self._event_key(event) not in span_keys]
+        events_to_show = filtered_events[:max_events]
         num_events = len(events_to_show)
         
         # Dynamic sizing based on number of events
@@ -179,9 +191,10 @@ class WeekRenderer(BaseRenderer):
 
             # Calculate vertical position based on event time
             if event.all_day:
-                # All-day events go at the top with fixed small height
+                # All-day events go at the top with extra room for wrapping
                 event_y = y
-                bar_height = min_bar_height
+                all_day_max_height = min(height // 3, min_bar_height * 3)
+                bar_height = all_day_max_height
             else:
                 # Convert start time to hours (with decimal for minutes)
                 event_hour = event.start.hour + event.start.minute / 60.0
@@ -202,8 +215,13 @@ class WeekRenderer(BaseRenderer):
 
             # Wrap text to fit in the bar
             # More lines allowed for longer events
-            max_text_lines = max(1, min(5, bar_height // line_height - 1))
+            max_text_lines = max(1, min(6, (bar_height - 4) // line_height))
             text_lines = self.wrap_text(event_text, width - 6, self.fonts[font_key], draw, max_lines=max_text_lines)
+
+            if event.all_day:
+                bar_height = max(min_bar_height, len(text_lines) * line_height + 4)
+                if bar_height > all_day_max_height:
+                    bar_height = all_day_max_height
 
             # Check if this overlaps with previous events at the same time
             # If so, nudge it down slightly
