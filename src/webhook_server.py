@@ -5,8 +5,8 @@ import json
 import os
 import subprocess
 import sys
-import cgi
 import shutil
+import re
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from utils.logger import get_logger
@@ -45,6 +45,52 @@ def get_config():
     except Exception as e:
         logger.error(f"Failed to read config: {e}")
         return None
+
+
+def parse_multipart_form(data, boundary):
+    """
+    Parse multipart/form-data without using the deprecated cgi module.
+    
+    Args:
+        data: Raw bytes of the form data
+        boundary: Boundary string from Content-Type header
+    
+    Returns:
+        dict: Parsed form fields and files
+    """
+    parts = data.split(('--' + boundary).encode())
+    files = {}
+    
+    for part in parts:
+        if not part or part == b'--\r\n' or part == b'--':
+            continue
+            
+        # Split headers from content
+        if b'\r\n\r\n' in part:
+            header_section, content = part.split(b'\r\n\r\n', 1)
+        else:
+            continue
+        
+        # Remove trailing \r\n from content
+        content = content.rstrip(b'\r\n')
+        
+        # Parse Content-Disposition header
+        header_section_str = header_section.decode('utf-8', errors='ignore')
+        
+        # Extract filename if present
+        filename_match = re.search(r'filename="([^"]+)"', header_section_str)
+        name_match = re.search(r'name="([^"]+)"', header_section_str)
+        
+        if filename_match and name_match:
+            field_name = name_match.group(1)
+            filename = filename_match.group(1)
+            files[field_name] = {
+                'filename': filename,
+                'content': content
+            }
+    
+    return files
+
 
 class WebhookHandler(BaseHTTPRequestHandler):
     """Handle webhook requests to trigger calendar updates."""
@@ -170,18 +216,27 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     logger.error("Upload failed: wrong content type")
                     return
                 
-                # Parse form data
-                form = cgi.FieldStorage(
-                    fp=self.rfile,
-                    headers=self.headers,
-                    environ={
-                        'REQUEST_METHOD': 'POST',
-                        'CONTENT_TYPE': content_type,
-                    }
-                )
+                # Extract boundary from Content-Type
+                boundary_match = re.search(r'boundary=([^;]+)', content_type)
+                if not boundary_match:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'text/plain')
+                    self.end_headers()
+                    self.wfile.write(b'Error: No boundary in Content-Type')
+                    logger.error("Upload failed: no boundary")
+                    return
+                
+                boundary = boundary_match.group(1).strip('"')
+                
+                # Read the request body
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length)
+                
+                # Parse the form data
+                files = parse_multipart_form(body, boundary)
                 
                 # Get the uploaded file
-                if 'file' not in form:
+                if 'file' not in files:
                     self.send_response(400)
                     self.send_header('Content-type', 'text/plain')
                     self.end_headers()
@@ -189,9 +244,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     logger.error("Upload failed: no file field")
                     return
                 
-                fileitem = form['file']
+                file_data = files['file']
+                filename = file_data['filename']
+                file_content = file_data['content']
                 
-                if not fileitem.filename:
+                if not filename:
                     self.send_response(400)
                     self.send_header('Content-type', 'text/plain')
                     self.end_headers()
@@ -200,7 +257,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     return
                 
                 # Validate file extension
-                filename = os.path.basename(fileitem.filename)
+                filename = os.path.basename(filename)
                 allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif']
                 file_ext = os.path.splitext(filename)[1].lower()
                 
@@ -227,7 +284,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     filepath = os.path.join(IMG_DIR, filename)
                 
                 with open(filepath, 'wb') as f:
-                    f.write(fileitem.file.read())
+                    f.write(file_content)
                 
                 logger.info(f"File uploaded successfully: {filename}")
                 
