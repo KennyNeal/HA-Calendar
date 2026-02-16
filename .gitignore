@@ -52,3 +52,7 @@ Thumbs.db
 # Test images
 *.png
 !docs/*.png
+
+# User images (keep folder, ignore contents)
+img/*
+!img/.gitkeep
