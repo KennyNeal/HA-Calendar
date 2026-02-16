@@ -3,9 +3,15 @@
 import sys
 import os
 import yaml
-import fcntl
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # Windows
+    fcntl = None
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -128,27 +134,39 @@ def main():
         weather_processor = WeatherDataProcessor()
         display = EPaperDisplay(config)
 
-        # Get current view selection
-        logger.info("Fetching current view selection...")
-        current_view = ha_client.get_current_view()
-        logger.info(f"Current view: {current_view}")
-
-        # Fetch weather data
-        logger.info("Fetching weather data...")
-        weather_data = ha_client.get_weather()
-        weather_info = weather_processor.parse_weather(weather_data)
-
-        # Fetch optional footer sensor
+        # Fetch view, weather, and footer sensor in parallel
         footer_sensor_text = None
-        if 'footer_sensor' in config and config['footer_sensor']:
-            footer_sensor_config = config['footer_sensor']
+        footer_sensor_config = config.get('footer_sensor')
+        sensor_entity_id = None
+        sensor_label = 'Sensor'
+
+        if footer_sensor_config:
             sensor_entity_id = footer_sensor_config.get('entity_id')
             sensor_label = footer_sensor_config.get('label', 'Sensor')
-            
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                'view': executor.submit(ha_client.get_current_view),
+                'weather': executor.submit(ha_client.get_weather)
+            }
+
             if sensor_entity_id:
+                futures['footer'] = executor.submit(ha_client.get_state, sensor_entity_id)
+
+            logger.info("Fetching current view selection...")
+            logger.info("Fetching weather data...")
+            if sensor_entity_id:
+                logger.info(f"Fetching footer sensor: {sensor_entity_id}")
+
+            current_view = futures['view'].result()
+            logger.info(f"Current view: {current_view}")
+
+            weather_data = futures['weather'].result()
+            weather_info = weather_processor.parse_weather(weather_data)
+
+            if 'footer' in futures:
                 try:
-                    logger.info(f"Fetching footer sensor: {sensor_entity_id}")
-                    sensor_data = ha_client.get_state(sensor_entity_id)
+                    sensor_data = futures['footer'].result()
                     sensor_value = sensor_data.get('state', 'Unknown')
                     footer_sensor_text = f"{sensor_label}: {sensor_value}"
                     logger.info(f"Footer sensor value: {footer_sensor_text}")
@@ -274,18 +292,25 @@ def main():
 
 if __name__ == '__main__':
     # Use file locking to prevent concurrent display access
-    lock_file = '/tmp/ha-calendar.lock'
+    lock_file = os.path.join(tempfile.gettempdir(), 'ha-calendar.lock')
     lock_fd = None
 
     try:
         # Try to acquire lock
-        lock_fd = open(lock_file, 'w')
-        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_fd = open(lock_file, 'a+')
+        lock_fd.write('1')
+        lock_fd.flush()
+
+        if fcntl:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        elif os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
 
         # Lock acquired, run main
         main()
 
-    except IOError:
+    except OSError:
         # Could not acquire lock - another instance is running
         print("Another calendar update is already running. Exiting.")
         sys.exit(0)
@@ -293,7 +318,11 @@ if __name__ == '__main__':
         # Release lock
         if lock_fd:
             try:
-                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                if fcntl:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                elif os.name == 'nt':
+                    import msvcrt
+                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
                 lock_fd.close()
             except:
                 pass

@@ -32,6 +32,7 @@ wheels/
 
 # Virtual environments
 venv/
+.venv/
 env/
 ENV/
 
@@ -52,6 +53,7 @@ Thumbs.db
 # Test images
 *.png
 !docs/*.png
+state.json
 
 # User images (keep folder, ignore contents)
 img/*
