@@ -149,51 +149,55 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 # Use venv Python if available, otherwise system Python
                 python_cmd = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
                 
-                # Run the picture display script in background
-                # Note: Picture script handles the 15-second display and returns to calendar
-                result = subprocess.run(
-                    [python_cmd, PICTURE_SCRIPT_PATH],
-                    capture_output=True,
-                    text=True,
-                    timeout=30,  # Should finish within 30 seconds
-                    cwd=DEPLOYMENT_DIR
-                )
-
-                if result.returncode == 0:
-                    self.send_response(200)
-                    self.send_header('Content-type', 'text/plain')
-                    self.end_headers()
-                    self.wfile.write(b'Picture displayed successfully! Returning to calendar...')
-                    logger.info("Picture display completed successfully")
-                    
-                    # Now trigger calendar refresh to restore display
-                    logger.info("Restoring calendar display...")
-                    refresh_result = subprocess.run(
-                        [python_cmd, CALENDAR_SCRIPT_PATH],
-                        capture_output=True,
-                        text=True,
-                        timeout=120,
-                        cwd=DEPLOYMENT_DIR
-                    )
-                    
-                    if refresh_result.returncode == 0:
-                        logger.info("Calendar restored successfully")
-                    else:
-                        logger.warning(f"Calendar restore had issues: {refresh_result.stderr}")
-                else:
-                    self.send_response(500)
-                    self.send_header('Content-type', 'text/plain')
-                    self.end_headers()
-                    error_msg = result.stderr or result.stdout or 'Unknown error'
-                    self.wfile.write(f'Error: {error_msg}'.encode())
-                    logger.error(f"Picture display failed (code {result.returncode}): {error_msg}")
-
-            except subprocess.TimeoutExpired:
-                self.send_response(500)
+                # Start picture display and calendar refresh in background
+                # This prevents timeout issues
+                import threading
+                
+                def display_and_refresh():
+                    """Display picture, wait, then refresh calendar."""
+                    try:
+                        # Display the picture (includes 15 second wait)
+                        result = subprocess.run(
+                            [python_cmd, PICTURE_SCRIPT_PATH],
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                            cwd=DEPLOYMENT_DIR
+                        )
+                        
+                        if result.returncode == 0:
+                            logger.info("Picture display completed successfully")
+                        else:
+                            logger.error(f"Picture display failed: {result.stderr}")
+                        
+                        # Now refresh the calendar
+                        logger.info("Restoring calendar display...")
+                        refresh_result = subprocess.run(
+                            [python_cmd, CALENDAR_SCRIPT_PATH],
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                            cwd=DEPLOYMENT_DIR
+                        )
+                        
+                        if refresh_result.returncode == 0:
+                            logger.info("Calendar restored successfully")
+                        else:
+                            logger.warning(f"Calendar restore had issues: {refresh_result.stderr}")
+                    except Exception as e:
+                        logger.error(f"Error in display_and_refresh: {e}")
+                
+                # Start the background thread
+                thread = threading.Thread(target=display_and_refresh, daemon=True)
+                thread.start()
+                
+                # Respond immediately
+                self.send_response(202)  # 202 Accepted
                 self.send_header('Content-type', 'text/plain')
                 self.end_headers()
-                self.wfile.write(b'Error: Picture display timed out')
-                logger.error("Picture display timed out")
+                self.wfile.write(b'Picture display started! Will show for 15 seconds then restore calendar.')
+                logger.info("Picture display started in background")
+
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-type', 'text/plain')
