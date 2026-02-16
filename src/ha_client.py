@@ -1,6 +1,7 @@
 """Home Assistant API client for fetching calendar and weather data."""
 
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 import time
 from utils.logger import get_logger
@@ -200,11 +201,25 @@ class HomeAssistantClient:
         Returns:
             dict: Dictionary mapping entity_id to list of events
         """
+        calendars = self.config.get('calendars', [])
         all_events = {}
 
-        for calendar in self.config['calendars']:
-            entity_id = calendar['entity_id']
-            events = self.get_calendar_events(entity_id, start_date, end_date)
-            all_events[entity_id] = events
+        if not calendars:
+            return all_events
+
+        max_workers = min(8, len(calendars))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(self.get_calendar_events, cal['entity_id'], start_date, end_date): cal['entity_id']
+                for cal in calendars
+            }
+
+            for future in as_completed(futures):
+                entity_id = futures[future]
+                try:
+                    all_events[entity_id] = future.result()
+                except Exception as e:
+                    self.logger.error(f"Failed to fetch events from {entity_id}: {e}")
+                    all_events[entity_id] = []
 
         return all_events

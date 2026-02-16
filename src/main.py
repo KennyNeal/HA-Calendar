@@ -4,6 +4,7 @@ import sys
 import os
 import yaml
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -133,27 +134,39 @@ def main():
         weather_processor = WeatherDataProcessor()
         display = EPaperDisplay(config)
 
-        # Get current view selection
-        logger.info("Fetching current view selection...")
-        current_view = ha_client.get_current_view()
-        logger.info(f"Current view: {current_view}")
-
-        # Fetch weather data
-        logger.info("Fetching weather data...")
-        weather_data = ha_client.get_weather()
-        weather_info = weather_processor.parse_weather(weather_data)
-
-        # Fetch optional footer sensor
+        # Fetch view, weather, and footer sensor in parallel
         footer_sensor_text = None
-        if 'footer_sensor' in config and config['footer_sensor']:
-            footer_sensor_config = config['footer_sensor']
+        footer_sensor_config = config.get('footer_sensor')
+        sensor_entity_id = None
+        sensor_label = 'Sensor'
+
+        if footer_sensor_config:
             sensor_entity_id = footer_sensor_config.get('entity_id')
             sensor_label = footer_sensor_config.get('label', 'Sensor')
-            
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                'view': executor.submit(ha_client.get_current_view),
+                'weather': executor.submit(ha_client.get_weather)
+            }
+
             if sensor_entity_id:
+                futures['footer'] = executor.submit(ha_client.get_state, sensor_entity_id)
+
+            logger.info("Fetching current view selection...")
+            logger.info("Fetching weather data...")
+            if sensor_entity_id:
+                logger.info(f"Fetching footer sensor: {sensor_entity_id}")
+
+            current_view = futures['view'].result()
+            logger.info(f"Current view: {current_view}")
+
+            weather_data = futures['weather'].result()
+            weather_info = weather_processor.parse_weather(weather_data)
+
+            if 'footer' in futures:
                 try:
-                    logger.info(f"Fetching footer sensor: {sensor_entity_id}")
-                    sensor_data = ha_client.get_state(sensor_entity_id)
+                    sensor_data = futures['footer'].result()
                     sensor_value = sensor_data.get('state', 'Unknown')
                     footer_sensor_text = f"{sensor_label}: {sensor_value}"
                     logger.info(f"Footer sensor value: {footer_sensor_text}")
