@@ -77,6 +77,14 @@ class TwoWeekRenderer(BaseRenderer):
         day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         today = date.today()
 
+        row_dates = [week_start + timedelta(days=i) for i in range(7)]
+        lanes, overflow, span_keys = self._get_all_day_span_lanes(row_dates, events_by_day, max_lanes=3)
+        lane_height = 18
+        all_day_height = lane_height * len(lanes)
+
+        all_day_top = y + 30
+        self._draw_all_day_spans(draw, all_day_top, col_width, lanes, lane_height)
+
         for i in range(7):
             current_date = week_start + timedelta(days=i)
             x = i * col_width
@@ -92,10 +100,12 @@ class TwoWeekRenderer(BaseRenderer):
                 current_date,
                 day_names[i],
                 events_by_day.get(current_date),
-                is_today
+                is_today,
+                all_day_height,
+                span_keys
             )
 
-    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_name, day_events, is_today):
+    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_name, day_events, is_today, all_day_height, span_keys):
         """
         Draw a single day cell.
 
@@ -131,13 +141,14 @@ class TwoWeekRenderer(BaseRenderer):
             self._draw_events_in_cell(
                 draw,
                 text_x,
-                y + 30,  # Start below the date
+                y + 30 + all_day_height,  # Start below the date and all-day spans
                 width - padding - (8 if is_today else 0) - padding,
-                height - 35,
-                day_events
+                height - 35 - all_day_height,
+                day_events,
+                span_keys
             )
 
-    def _draw_events_in_cell(self, draw, x, y, width, height, day_events):
+    def _draw_events_in_cell(self, draw, x, y, width, height, day_events, span_keys):
         """
         Draw events within a cell.
 
@@ -152,23 +163,24 @@ class TwoWeekRenderer(BaseRenderer):
         max_events = self.view_config.get('max_events_per_day', 3)
         show_time = self.view_config.get('show_time', True)
 
-        events_to_show = day_events.events[:max_events]
+        filtered_events = [event for event in day_events.events if self._event_key(event) not in span_keys]
+        events_to_show = filtered_events[:max_events]
         num_events = len(events_to_show)
         
         # Dynamic sizing based on number of events
         # Fewer events = larger, more readable text
         if num_events <= 2:
             line_height = 18
+            min_bar_height = 36
             font_key = 'medium'
-            max_lines_per_event = 3
         elif num_events <= 3:
             line_height = 16
+            min_bar_height = 28
             font_key = 'normal'
-            max_lines_per_event = 2
         else:
             line_height = 14
+            min_bar_height = 22
             font_key = 'small'
-            max_lines_per_event = 2
         
         current_y = y
 
@@ -180,11 +192,19 @@ class TwoWeekRenderer(BaseRenderer):
             else:
                 event_text = event.title
 
-            # Wrap text
-            text_lines = self.wrap_text(event_text, width - 6, self.fonts[font_key], draw, max_lines=max_lines_per_event)
+            # Wrap text based on remaining space in the cell
+            remaining_height = (y + height) - current_y
+            max_text_lines = max(1, min(6, (remaining_height - 4) // line_height))
+            text_lines = self.wrap_text(
+                event_text,
+                width - 6,
+                self.fonts[font_key],
+                draw,
+                max_lines=max_text_lines
+            )
 
             # Calculate bar height based on number of lines
-            bar_height = len(text_lines) * line_height + 4
+            bar_height = max(min_bar_height, len(text_lines) * line_height + 4)
 
             # Check if we have space
             if current_y + bar_height > y + height:
@@ -209,9 +229,10 @@ class TwoWeekRenderer(BaseRenderer):
             current_y += bar_height + 2  # Add small gap between events
 
         # Show "+X more" if there are overflow events
-        if hasattr(day_events, 'overflow_count') and day_events.overflow_count > 0:
+        overflow_count = max(0, len(filtered_events) - max_events)
+        if overflow_count > 0:
             if current_y + 15 <= y + height:
-                more_text = f"+{day_events.overflow_count} more"
+                more_text = f"+{overflow_count} more"
                 self.draw_text(
                     draw,
                     more_text,

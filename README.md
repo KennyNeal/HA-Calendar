@@ -348,6 +348,20 @@ For development on machines without the e-paper hardware:
 2. Run `python3 src/main.py`
 3. View the generated `calendar_display.png`
 
+### Windows Local Setup (Mock Mode)
+
+On Windows, the Pi-only packages (`spidev`, `RPi.GPIO`) will not install. Use a local venv and install only the cross-platform dependencies:
+
+```powershell
+cd C:\Users\<you>\HA-Calendar
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install requests PyYAML python-dateutil pytz pillow
+```
+
+Then set `mock_mode: true` and run `python src/main.py`.
+
 ### Project Structure
 
 ```

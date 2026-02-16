@@ -46,6 +46,14 @@ class FourDayRenderer(BaseRenderer):
         today = date.today()
 
         # Draw 4 days starting from today
+        row_dates = [today + timedelta(days=i) for i in range(4)]
+        lanes, overflow, span_keys = self._get_all_day_span_lanes(row_dates, events_by_day, max_lanes=3)
+        lane_height = 18
+        all_day_height = lane_height * len(lanes)
+
+        all_day_top = y + 60
+        self._draw_all_day_spans(draw, all_day_top, col_width, lanes, lane_height)
+
         for i in range(4):
             current_date = today + timedelta(days=i)
             x = i * col_width
@@ -59,7 +67,9 @@ class FourDayRenderer(BaseRenderer):
                 available_height,
                 current_date,
                 events_by_day.get(current_date),
-                is_today
+                is_today,
+                all_day_height,
+                span_keys
             )
 
         # Draw footer with last updated time
@@ -68,7 +78,7 @@ class FourDayRenderer(BaseRenderer):
         self.logger.info("Rendered 4-day view")
         return image
 
-    def _draw_day_column(self, draw, x, y, width, height, date_obj, day_events, is_today):
+    def _draw_day_column(self, draw, x, y, width, height, date_obj, day_events, is_today, all_day_height, span_keys):
         """
         Draw a single day column.
 
@@ -106,13 +116,14 @@ class FourDayRenderer(BaseRenderer):
             self._draw_events_in_column(
                 draw,
                 text_x,
-                y + 60,  # Start below the date
+                y + 60 + all_day_height,  # Start below the date and all-day spans
                 width - (2 * padding),
-                height - 65,
-                day_events
+                height - 65 - all_day_height,
+                day_events,
+                span_keys
             )
 
-    def _draw_events_in_column(self, draw, x, y, width, height, day_events):
+    def _draw_events_in_column(self, draw, x, y, width, height, day_events, span_keys):
         """
         Draw events within a column with time-based vertical positioning.
         Event heights are proportional to their duration.
@@ -128,7 +139,8 @@ class FourDayRenderer(BaseRenderer):
         max_events = self.view_config.get('max_events_per_day', 10)
         show_time = self.view_config.get('show_time', True)
 
-        events_to_show = day_events.events[:max_events]
+        filtered_events = [event for event in day_events.events if self._event_key(event) not in span_keys]
+        events_to_show = filtered_events[:max_events]
         num_events = len(events_to_show)
         
         # Dynamic sizing based on number of events
@@ -165,9 +177,10 @@ class FourDayRenderer(BaseRenderer):
 
             # Calculate vertical position based on event time
             if event.all_day:
-                # All-day events go at the top with fixed small height
+                # All-day events go at the top with extra room for wrapping
                 event_y = y
-                bar_height = min_bar_height
+                all_day_max_height = min(height // 3, min_bar_height * 3)
+                bar_height = all_day_max_height
             else:
                 # Convert start time to hours (with decimal for minutes)
                 event_hour = event.start.hour + event.start.minute / 60.0
@@ -190,6 +203,11 @@ class FourDayRenderer(BaseRenderer):
             # More lines allowed for longer events
             max_text_lines = max(1, min(6, (bar_height - 4) // line_height))
             text_lines = self.wrap_text(event_text, width - 6, self.fonts[font_key], draw, max_lines=max_text_lines)
+
+            if event.all_day:
+                bar_height = max(min_bar_height, len(text_lines) * line_height + 4)
+                if bar_height > all_day_max_height:
+                    bar_height = all_day_max_height
 
             # Check if this overlaps with previous events at the same time
             # If so, nudge it down slightly

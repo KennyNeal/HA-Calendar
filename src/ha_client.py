@@ -151,6 +151,20 @@ class HomeAssistantClient:
         Returns:
             str: View name ('two_week', 'month', 'week', 'agenda')
         """
+        override_view = self.config.get('view_selector', {}).get('override_view')
+        if override_view:
+            view = str(override_view).lower().replace(' ', '_').replace('-', '_')
+            view_mappings = {
+                '4_day': 'four_day',
+                '2_week': 'two_week'
+            }
+            view = view_mappings.get(view, view)
+            valid_views = ['two_week', 'four_day', 'month', 'week', 'agenda']
+            if view in valid_views:
+                self.logger.info(f"Using local override view: {view}")
+                return view
+            self.logger.warning(f"Invalid override view '{override_view}', ignoring")
+
         try:
             view_entity = self.config['view_selector']['entity_id']
             state_data = self.get_state(view_entity)
