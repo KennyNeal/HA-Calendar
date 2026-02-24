@@ -133,7 +133,9 @@ class MonthRenderer(BaseRenderer):
                     events_by_day.get(current_date),
                     is_today,
                     in_current_month,
-                    None
+                    None,
+                    month,
+                    year
                 )
 
                 current_date += timedelta(days=1)
@@ -146,7 +148,7 @@ class MonthRenderer(BaseRenderer):
         self.logger.info("Rendered month calendar view")
         return image
 
-    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_events, is_today, in_current_month, weather_info=None):
+    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_events, is_today, in_current_month, weather_info=None, current_month=None, current_year=None):
         """
         Draw a single day cell for month view.
 
@@ -161,10 +163,23 @@ class MonthRenderer(BaseRenderer):
             is_today: Boolean indicating if this is today
             in_current_month: Boolean indicating if date is in current month
             weather_info: WeatherInfo object (today only)
+            current_month: Current month number (for distinguishing prev/next month)
+            current_year: Current year number (for distinguishing prev/next month)
         """
         # Draw cell border
         border_width = 1
         self.draw_box(draw, x, y, width, height, outline=self.black, outline_width=border_width)
+
+        # Check if this is previous month (before current month started)
+        is_prev_month = (not in_current_month and 
+                        (date_obj.year < current_year or 
+                         (date_obj.year == current_year and date_obj.month < current_month)))
+        
+        # If previous month, fill with light grey and skip content
+        if is_prev_month:
+            light_grey = 0xD3D3D3  # Light grey color
+            self.draw_box(draw, x + 1, y + 1, width - 2, height - 2, fill=light_grey)
+            return
 
         # Draw blue header background bar for today's date
         if is_today and in_current_month:
