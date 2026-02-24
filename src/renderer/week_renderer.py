@@ -32,14 +32,13 @@ class WeekRenderer(BaseRenderer):
         """
         image, draw = self.create_canvas()
 
-        # Draw header with weather
-        header_height = 50
-        y = self.draw_header(draw, weather_info, header_height)
+        # No header - grid extends to top
+        y = 0
 
         # Calculate grid dimensions
         # Layout: 1 row (week) x 7 columns (days) with larger cells
         footer_height = 40  # Footer with last updated time
-        available_height = self.height - header_height - footer_height
+        available_height = self.height - footer_height
         row_height = available_height
         col_width = self.width // 7
 
@@ -48,7 +47,7 @@ class WeekRenderer(BaseRenderer):
         week_start = today - timedelta(days=today.weekday())  # Monday of current week
 
         # Draw week row
-        self._draw_week_row(draw, week_start, y, row_height, col_width, events_by_day)
+        self._draw_week_row(draw, week_start, y, row_height, col_width, events_by_day, weather_info)
 
         # Draw footer with last updated time
         self.draw_footer(draw, y + row_height, footer_height, footer_sensor_text)
@@ -58,7 +57,7 @@ class WeekRenderer(BaseRenderer):
         self.logger.info("Rendered week calendar view")
         return image
 
-    def _draw_week_row(self, draw, week_start, y, row_height, col_width, events_by_day):
+    def _draw_week_row(self, draw, week_start, y, row_height, col_width, events_by_day, weather_info=None):
         """
         Draw the week row.
 
@@ -69,6 +68,7 @@ class WeekRenderer(BaseRenderer):
             row_height: Height of the row
             col_width: Width of each column
             events_by_day: Dictionary mapping date to DayEvents
+            weather_info: WeatherInfo object (for current week only)
         """
         day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         today = date.today()
@@ -98,10 +98,11 @@ class WeekRenderer(BaseRenderer):
                 events_by_day.get(current_date),
                 is_today,
                 all_day_height,
-                span_keys
+                span_keys,
+                weather_info if is_today else None
             )
 
-    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_name, day_events, is_today, all_day_height, span_keys):
+    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_name, day_events, is_today, all_day_height, span_keys, weather_info=None):
         """
         Draw a single day cell for week view.
 
@@ -115,24 +116,70 @@ class WeekRenderer(BaseRenderer):
             day_name: Full day name (e.g., 'Monday')
             day_events: DayEvents object or None
             is_today: Boolean indicating if this is today
+            all_day_height: Height of all-day event spans
+            span_keys: Set of span event keys
+            weather_info: WeatherInfo object (today only)
         """
-        # Draw cell border (thicker if today)
-        border_width = 3 if is_today else 1
+        # Draw cell border
+        border_width = 1
         self.draw_box(draw, x, y, width, height, outline=self.black, outline_width=border_width)
 
-        # Draw day name and date
+        # Draw blue header background bar (height 40)
+        header_height = 40
+        self.draw_box(draw, x + 1, y + 1, width - 2, header_height - 2, fill=self.blue)
+
+        # Draw day name and date in white on blue background
         padding = 8
         date_header = f"{day_name[:3]} {date_obj.day}"
-        self.draw_text(draw, date_header, x + padding, y + padding, self.fonts['large'], self.black)
+        text_x = x + padding
+        text_y = y + 8
+        self.draw_text(draw, date_header, text_x, text_y, self.fonts['large'], self.white)
+
+        # Draw weather icon and temperature right-aligned in header
+        if weather_info:
+            icon, condition = self.get_weather_icon_for_date(weather_info, date_obj)
+            
+            # Get temperature for this date from forecast dict
+            temp_str = None
+            if weather_info and weather_info.forecast:
+                date_key = date_obj.isoformat()
+                forecast = weather_info.forecast.get(date_key)
+                if forecast and forecast.temperature:
+                    temp_str = f"{int(forecast.temperature)}°"
+            
+            # Fallback to current temperature if no forecast available
+            if not temp_str and weather_info and weather_info.temperature:
+                temp_str = f"{int(weather_info.temperature)}°"
+            
+            if icon or temp_str:
+                weather_icon_font = self.fonts.get('weather_small', self.fonts['small'])
+                
+                # Prepare text string: icon (if available) + temperature
+                weather_display = ""
+                if icon:
+                    weather_display = icon + " "
+                if temp_str:
+                    weather_display += temp_str
+                
+                # Measure width
+                display_bbox = draw.textbbox((0, 0), weather_display, font=weather_icon_font)
+                display_width = display_bbox[2] - display_bbox[0]
+                
+                # Position from right edge of cell
+                weather_x = x + width - 10 - display_width
+                weather_y = y + 8
+                
+                # Draw weather info
+                self.draw_text(draw, weather_display, weather_x, weather_y, weather_icon_font, self.white)
 
         # Draw events if any
         if day_events and day_events.events:
             self._draw_events_in_cell(
                 draw,
-                x + padding,
-                y + 40 + all_day_height,  # Start below the date header and all-day spans
+                text_x,
+                y + header_height + all_day_height,  # Start below the header and all-day spans
                 width - (2 * padding),
-                height - 45 - all_day_height,
+                height - header_height - all_day_height - 2,
                 day_events,
                 span_keys
             )

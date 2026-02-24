@@ -138,11 +138,145 @@ class HomeAssistantClient:
         """
         try:
             weather_entity = self.config['weather']['entity_id']
+            self.logger.info(f"Fetching weather entity: {weather_entity}")
             weather_data = self.get_state(weather_entity)
-            self.logger.info(f"Fetched weather: {weather_data.get('state')}")
+            
+            # Log forecast data availability
+            if weather_data:
+                state = weather_data.get('state')
+                attributes = weather_data.get('attributes', {})
+                
+                # Log all available attributes
+                self.logger.info(f"Weather state: {state}")
+                self.logger.info(f"Weather attributes keys: {list(attributes.keys())}")
+                
+                # Log full attributes for debugging
+                self.logger.debug(f"Full weather attributes: {attributes}")
+                
+                # Check for forecast in multiple possible locations
+                forecast = attributes.get('forecast', [])
+                if not forecast:
+                    # Try alternative names
+                    forecast = attributes.get('forecasts', [])
+                if not forecast:
+                    forecast = attributes.get('daily_forecast', [])
+                if not forecast:
+                    forecast = attributes.get('hourly_forecast', [])
+                
+                self.logger.info(f"Fetched weather: {state}, Forecast items: {len(forecast)}")
+                
+                # Log first few forecast items
+                for i, f in enumerate(forecast[:5]):
+                    if isinstance(f, dict):
+                        date_key = f.get('date') or f.get('datetime') or f.get('date_attr')
+                        condition = f.get('condition', 'N/A')
+                        temp = f.get('temperature', 'N/A')
+                        self.logger.info(f"  Forecast {i}: {date_key} -> {condition} ({temp}°)")
+                    else:
+                        self.logger.debug(f"  Forecast {i}: {f}")
+            else:
+                self.logger.warning("Weather data is None")
+            
             return weather_data
         except Exception as e:
             self.logger.warning(f"Failed to fetch weather data: {e}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
+            return None
+
+    def get_weather_forecast(self):
+        """
+        Fetch multi-day weather forecast using HA service.
+
+        Returns:
+            dict: Forecast service response or None if unavailable
+        """
+        try:
+            weather_entity = self.config['weather']['entity_id']
+            self.logger.info(f"Calling weather.get_forecasts service for: {weather_entity}")
+            
+            # Call weather.get_forecasts service with 'daily' type
+            service_name = 'get_forecasts'
+            url = f"{self.base_url}/api/services/weather/{service_name}?return_response"
+            
+            # Payload format for homeassistant.call_service
+            payload = {
+                "entity_id": weather_entity,
+                "type": "daily"
+            }
+            
+            self.logger.info(f"  Request URL: {url}")
+            self.logger.info(f"  Payload: {payload}")
+            
+            response = self._retry_request('post', url, json=payload, headers=self._get_headers())
+            result = response.json()
+            
+            self.logger.info(f"Forecast service raw response type: {type(result).__name__}")
+            if isinstance(result, dict):
+                self.logger.info(f"  Response keys: {list(result.keys())}")
+            
+            self.logger.debug(f"Full response: {result}")
+            
+            # Extract the forecast data from the response structure
+            forecast_response = result
+            
+            # Check if wrapped in 'service_response'
+            if isinstance(result, dict) and 'service_response' in result:
+                forecast_response = result.get('service_response', {})
+                self.logger.info(f"Extracted from 'service_response' wrapper")
+            elif isinstance(result, dict) and result.get('result'):
+                forecast_response = result.get('result', {})
+                self.logger.info(f"Extracted from 'result' wrapper")
+            
+            # Log forecast data if available
+            if isinstance(forecast_response, dict):
+                for entity_id, entity_data in forecast_response.items():
+                    self.logger.info(f"Entity: {entity_id}")
+                    
+                    if isinstance(entity_data, dict):
+                        # Check if forecast is under 'forecast' key
+                        forecasts = entity_data.get('forecast', [])
+                        if forecasts:
+                            self.logger.info(f"  Found {len(forecasts)} forecast items in 'forecast' key")
+                        else:
+                            self.logger.info(f"  Entity data keys: {list(entity_data.keys())}")
+                    elif isinstance(entity_data, list):
+                        forecasts = entity_data
+                        self.logger.info(f"  Found {len(forecasts)} forecast items (direct array)")
+                    else:
+                        self.logger.info(f"  Unknown data type: {type(entity_data).__name__}")
+                        continue
+                    
+                    # Log first 3 forecasts with all details
+                    if forecasts:
+                        for i, f in enumerate(forecasts[:3]):
+                            if isinstance(f, dict):
+                                date_key = f.get('datetime', 'N/A')
+                                condition = f.get('condition', 'N/A')
+                                temp = f.get('temperature', 'N/A')
+                                templow = f.get('templow', 'N/A')
+                                wind = f.get('wind_speed', 'N/A')
+                                humidity = f.get('humidity', 'N/A')
+                                self.logger.info(f"    [{i}] {date_key}")
+                                self.logger.info(f"        Condition: {condition}, Temp: {temp}°/{templow}°")
+                                self.logger.info(f"        Wind: {wind}, Humidity: {humidity}%")
+            
+            return forecast_response if forecast_response else None
+                
+        except requests.exceptions.HTTPError as e:
+            # Forecast service returned an HTTP error
+            self.logger.warning(f"Weather forecast service HTTP error {e.response.status_code}")
+            try:
+                error_detail = e.response.text
+                self.logger.info(f"  Error response: {error_detail}")
+            except:
+                pass
+            return None
+        except Exception as e:
+            # Forecast service failed
+            self.logger.warning(f"Weather forecast service failed: {e}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
             return None
 
     def get_current_view(self):

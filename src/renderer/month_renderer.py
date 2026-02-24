@@ -33,14 +33,13 @@ class MonthRenderer(BaseRenderer):
         """
         image, draw = self.create_canvas()
 
-        # Draw header with weather
-        header_height = 50
-        y = self.draw_header(draw, weather_info, header_height)
+        # No header - grid extends to top
+        y = 0
 
         # Calculate grid dimensions
         # Layout: Up to 6 rows (weeks) x 7 columns (days)
         footer_height = 40  # Footer with last updated time
-        available_height = self.height - header_height - footer_height
+        available_height = self.height - footer_height
         row_height = available_height // 6
         col_width = self.width // 7
 
@@ -88,20 +87,21 @@ class MonthRenderer(BaseRenderer):
                     current_date,
                     events_by_day.get(current_date),
                     is_today,
-                    in_current_month
+                    in_current_month,
+                    weather_info if is_today else None
                 )
 
                 current_date += timedelta(days=1)
 
         # Draw footer with last updated time
-        self.draw_footer(draw, header_height + available_height, footer_height, footer_sensor_text)
+        self.draw_footer(draw, available_height, footer_height, footer_sensor_text)
 
         # Legend removed - calendar colors are self-explanatory
 
         self.logger.info("Rendered month calendar view")
         return image
 
-    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_events, is_today, in_current_month):
+    def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_events, is_today, in_current_month, weather_info=None):
         """
         Draw a single day cell for month view.
 
@@ -115,37 +115,123 @@ class MonthRenderer(BaseRenderer):
             day_events: DayEvents object or None
             is_today: Boolean indicating if this is today
             in_current_month: Boolean indicating if date is in current month
+            weather_info: WeatherInfo object (today only)
         """
-        # Draw cell border (thicker if today)
-        border_width = 3 if is_today else 1
-        cell_color = self.white if in_current_month else (240, 240, 240)
-
-        # Fill cell background (grayed out if not in current month)
-        if not in_current_month:
-            # For e-paper, we can't do true gray, so just use lighter appearance
-            pass  # Keep white, but we'll use lighter text
-
+        # Draw cell border
+        border_width = 1
         self.draw_box(draw, x, y, width, height, outline=self.black, outline_width=border_width)
 
-        # Draw date number
-        padding = 5
-        date_str = str(date_obj.day)
-        text_color = self.black if in_current_month else (128, 128, 128)
-        # Since e-paper has limited colors, just use black
-        text_color = self.black
+        # Draw blue header background bar for today's date
+        if is_today and in_current_month:
+            header_height = 25
+            self.draw_box(draw, x + 1, y + 1, width - 2, header_height - 2, fill=self.blue)
+            
+            # Draw date in white on blue background
+            date_str = str(date_obj.day)
+            self.draw_text(draw, date_str, x + 5, y + 5, self.fonts['medium'], self.white)
+            
+            # Draw weather icon and temperature right-aligned in header
+            if weather_info:
+                icon, condition = self.get_weather_icon_for_date(weather_info, date_obj)
+                
+                # Get temperature for this date from forecast dict
+                temp_str = None
+                if weather_info and weather_info.forecast:
+                    date_key = date_obj.isoformat()
+                    forecast = weather_info.forecast.get(date_key)
+                    if forecast and forecast.temperature:
+                        temp_str = f"{int(forecast.temperature)}°"
+                
+                # Fallback to current temperature if no forecast available
+                if not temp_str and weather_info and weather_info.temperature:
+                    temp_str = f"{int(weather_info.temperature)}°"
+                
+                if icon or temp_str:
+                    weather_icon_font = self.fonts.get('weather_small', self.fonts['small'])
+                    
+                    # Prepare text string: icon (if available) + temperature
+                    weather_display = ""
+                    if icon:
+                        weather_display = icon + " "
+                    if temp_str:
+                        weather_display += temp_str
+                    
+                    # Measure width
+                    display_bbox = draw.textbbox((0, 0), weather_display, font=weather_icon_font)
+                    display_width = display_bbox[2] - display_bbox[0]
+                    
+                    # Position from right edge of cell
+                    weather_x = x + width - 5 - display_width
+                    weather_y = y + 4
+                    
+                    # Draw weather info
+                    self.draw_text(draw, weather_display, weather_x, weather_y, weather_icon_font, self.white)
+            
+            # Draw event indicators below the header
+            if day_events and day_events.events:
+                self._draw_event_indicators(
+                    draw,
+                    x + 5,
+                    y + header_height + 3,
+                    width - 10,
+                    height - header_height - 5,
+                    day_events
+                )
+        else:
+            # Draw date number
+            padding = 5
+            date_str = str(date_obj.day)
+            text_color = self.black if in_current_month else self.black
+            
+            self.draw_text(draw, date_str, x + padding, y + padding, self.fonts['medium'], text_color)
 
-        self.draw_text(draw, date_str, x + padding, y + padding, self.fonts['medium'], text_color)
+            # Draw weather icon and temperature for non-today dates
+            if weather_info and in_current_month:
+                icon, condition = self.get_weather_icon_for_date(weather_info, date_obj)
+                
+                # Get temperature for this date from forecast dict
+                temp_str = None
+                if weather_info and weather_info.forecast:
+                    date_key = date_obj.isoformat()
+                    forecast = weather_info.forecast.get(date_key)
+                    if forecast and forecast.temperature:
+                        temp_str = f"{int(forecast.temperature)}°"
+                
+                # Fallback to current temperature if no forecast available
+                if not temp_str and weather_info and weather_info.temperature:
+                    temp_str = f"{int(weather_info.temperature)}°"
+                
+                if icon or temp_str:
+                    weather_icon_font = self.fonts.get('weather_small', self.fonts['small'])
+                    
+                    # Prepare text string: icon (if available) + temperature
+                    weather_display = ""
+                    if icon:
+                        weather_display = icon + " "
+                    if temp_str:
+                        weather_display += temp_str
+                    
+                    # Measure width
+                    display_bbox = draw.textbbox((0, 0), weather_display, font=weather_icon_font)
+                    display_width = display_bbox[2] - display_bbox[0]
+                    
+                    # Position from right edge of cell
+                    weather_x = x + width - 5 - display_width
+                    weather_y = y + 5
+                    
+                    # Draw weather info
+                    self.draw_text(draw, weather_display, weather_x, weather_y, weather_icon_font, self.black)
 
-        # Draw event indicators if any
-        if day_events and day_events.events and in_current_month:
-            self._draw_event_indicators(
-                draw,
-                x + padding,
-                y + 25,  # Start below the date
-                width - (2 * padding),
-                height - 30,
-                day_events
-            )
+            # Draw event indicators if any
+            if day_events and day_events.events and in_current_month:
+                self._draw_event_indicators(
+                    draw,
+                    x + padding,
+                    y + 25,  # Start below the date
+                    width - (2 * padding),
+                    height - 30,
+                    day_events
+                )
 
     def _draw_event_indicators(self, draw, x, y, width, height, day_events):
         """

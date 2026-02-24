@@ -162,7 +162,18 @@ def main():
             logger.info(f"Current view: {current_view}")
 
             weather_data = futures['weather'].result()
-            weather_info = weather_processor.parse_weather(weather_data)
+            
+            # Try to get forecast data from the weather service
+            forecast_data = None
+            try:
+                logger.info("Calling weather.get_forecasts service...")
+                forecast_data = ha_client.get_weather_forecast()
+                if forecast_data:
+                    logger.info("Forecast service retrieved successfully")
+            except Exception as e:
+                logger.warning(f"Weather forecast service error: {e}")
+            
+            weather_info = weather_processor.parse_weather(weather_data, forecast_data)
 
             if 'footer' in futures:
                 try:

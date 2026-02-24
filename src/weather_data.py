@@ -1,7 +1,17 @@
 """Weather data processing from Home Assistant."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from utils.logger import get_logger
+
+
+@dataclass
+class DayForecast:
+    """Represents weather forecast for a single day."""
+    date: str  # ISO format date YYYY-MM-DD
+    condition: str
+    temperature: float
+    wind_speed: float
 
 
 @dataclass
@@ -13,6 +23,7 @@ class WeatherInfo:
     humidity: int
     wind_speed: float
     wind_speed_unit: str
+    forecast: dict = None  # Maps date string (YYYY-MM-DD) to DayForecast
 
 
 class WeatherDataProcessor:
@@ -43,12 +54,13 @@ class WeatherDataProcessor:
         """Initialize weather data processor."""
         self.logger = get_logger()
 
-    def parse_weather(self, weather_data):
+    def parse_weather(self, weather_data, forecast_service_data=None):
         """
         Parse weather data from HA API response.
 
         Args:
             weather_data: Weather entity state data from API
+            forecast_service_data: Optional forecast data from weather.get_forecasts service
 
         Returns:
             WeatherInfo: Parsed weather object or None if unavailable
@@ -68,23 +80,128 @@ class WeatherDataProcessor:
             wind_speed = attributes.get('wind_speed', 0)
             wind_speed_unit = attributes.get('wind_speed_unit', 'mph')
 
+            # Extract and parse forecast data
+            forecast_dict = {}
+            
+            # First try forecast service data (preferred - has multi-day forecasts)
+            if forecast_service_data:
+                self.logger.info(f"Processing forecast service data with {len(forecast_service_data)} entities")
+                
+                # Extract forecast from service response
+                # forecast_service_data is dict with entity_id as key
+                # Each entity has either:
+                #   - 'forecast' key with array of forecasts
+                #   - or directly an array of forecasts
+                
+                for entity_id, entity_data in forecast_service_data.items():
+                    if 'weather' not in entity_id:
+                        continue
+                    
+                    self.logger.debug(f"Processing {entity_id}")
+                    forecasts_list = None
+                    
+                    # Check if entity_data is a dict with 'forecast' key
+                    if isinstance(entity_data, dict) and 'forecast' in entity_data:
+                        forecasts_list = entity_data.get('forecast', [])
+                        self.logger.info(f"  Entity has forecast key with {len(forecasts_list)} items")
+                    elif isinstance(entity_data, list):
+                        # Forecast data is directly an array
+                        forecasts_list = entity_data
+                        self.logger.info(f"  Entity is direct array with {len(forecasts_list)} items")
+                    
+                    if forecasts_list:
+                        for i, forecast_item in enumerate(forecasts_list):
+                            if not isinstance(forecast_item, dict):
+                                self.logger.warning(f"Forecast item {i} is not a dict: {type(forecast_item)}")
+                                continue
+                            
+                            # Service returns datetime key
+                            date_str = forecast_item.get('datetime', '')
+                            if date_str:
+                                # Extract just the date part (YYYY-MM-DD)
+                                date_key = date_str.split('T')[0] if 'T' in date_str else date_str
+                                
+                                day_forecast = DayForecast(
+                                    date=date_key,
+                                    condition=forecast_item.get('condition', 'unknown'),
+                                    temperature=forecast_item.get('temperature', 0),
+                                    wind_speed=forecast_item.get('wind_speed', 0)
+                                )
+                                forecast_dict[date_key] = day_forecast
+                                if i < 5:
+                                    self.logger.info(f"  Forecast {i}: {date_key} -> {day_forecast.condition} ({day_forecast.temperature}°)")
+            
+            # If no forecast from service, try entity attributes
+            if not forecast_dict:
+                self.logger.debug("No forecast from service, trying entity attributes")
+                
+                # Try multiple possible attribute names
+                forecast_data = attributes.get('forecast', [])
+                if not forecast_data:
+                    forecast_data = attributes.get('forecasts', [])
+                if not forecast_data:
+                    forecast_data = attributes.get('daily_forecast', [])
+                if not forecast_data:
+                    forecast_data = attributes.get('hourly_forecast', [])
+                
+                self.logger.debug(f"Raw forecast data type: {type(forecast_data)}, length: {len(forecast_data) if forecast_data else 0}")
+                
+                if forecast_data:
+                    for i, forecast_item in enumerate(forecast_data):
+                        # Handle both date and datetime keys
+                        date_str = forecast_item.get('date') or forecast_item.get('datetime')
+                        if date_str:
+                            # Extract just the date part (YYYY-MM-DD)
+                            date_key = date_str.split('T')[0] if 'T' in str(date_str) else str(date_str)
+                            
+                            day_forecast = DayForecast(
+                                date=date_key,
+                                condition=forecast_item.get('condition', 'unknown'),
+                                temperature=forecast_item.get('temperature', 0),
+                                wind_speed=forecast_item.get('wind_speed', 0)
+                            )
+                            forecast_dict[date_key] = day_forecast
+                            self.logger.debug(f"Forecast {i}: {date_key} -> {day_forecast.condition}")
+
+            # Also add today's weather to forecast if not already there (fallback)
+            today_key = datetime.now().date().isoformat()
+            if today_key not in forecast_dict:
+                today_forecast = DayForecast(
+                    date=today_key,
+                    condition=state,
+                    temperature=temperature if temperature is not None else 0,
+                    wind_speed=wind_speed
+                )
+                forecast_dict[today_key] = today_forecast
+                self.logger.debug(f"Added today's weather as fallback: {today_key} -> {state}")
+
             weather_info = WeatherInfo(
                 condition=state.capitalize(),
                 temperature=temperature if temperature is not None else 0,
                 temperature_unit=temperature_unit,
                 humidity=humidity,
                 wind_speed=wind_speed,
-                wind_speed_unit=wind_speed_unit
+                wind_speed_unit=wind_speed_unit,
+                forecast=forecast_dict if forecast_dict else None
             )
 
             self.logger.info(
                 f"Parsed weather: {weather_info.condition}, "
-                f"{weather_info.temperature}{weather_info.temperature_unit}"
+                f"{weather_info.temperature}{weather_info.temperature_unit}, "
+                f"Forecast days: {len(forecast_dict)}"
             )
             return weather_info
 
         except Exception as e:
             self.logger.error(f"Failed to parse weather data: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return None
+
+        except Exception as e:
+            self.logger.error(f"Failed to parse weather data: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
             return None
 
     def format_weather_text(self, weather_info):

@@ -151,6 +151,32 @@ class BaseRenderer:
         draw = ImageDraw.Draw(image)
         return image, draw
 
+    def get_weather_icon_for_date(self, weather_info, date_obj):
+        """
+        Get weather icon for a specific date if forecast is available.
+
+        Args:
+            weather_info: WeatherInfo object or None
+            date_obj: date object
+
+        Returns:
+            tuple: (icon_str, condition_str) or (None, None) if no forecast available
+        """
+        if not weather_info or not weather_info.forecast:
+            return None, None
+        
+        date_key = date_obj.isoformat()  # YYYY-MM-DD format
+        forecast = weather_info.forecast.get(date_key)
+        
+        if not forecast:
+            return None, None
+        
+        from weather_data import WeatherDataProcessor
+        weather_processor = WeatherDataProcessor()
+        icon = weather_processor.get_weather_icon(forecast.condition.lower())
+        
+        return icon, forecast.condition
+
     def draw_text(self, draw, text, x, y, font, color, max_width=None, align='left'):
         """
         Draw text with optional truncation.
