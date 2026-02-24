@@ -99,7 +99,7 @@ class WeekRenderer(BaseRenderer):
                 is_today,
                 all_day_height,
                 span_keys,
-                weather_info if is_today else None
+                weather_info
             )
 
     def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_name, day_events, is_today, all_day_height, span_keys, weather_info=None):
@@ -128,14 +128,18 @@ class WeekRenderer(BaseRenderer):
         header_height = 40
         self.draw_box(draw, x + 1, y + 1, width - 2, header_height - 2, fill=self.blue)
 
-        # Draw day name and date in white on blue background
-        padding = 8
-        date_header = f"{day_name[:3]} {date_obj.day}"
+        # Draw day name and date in white on blue background (inline, slightly larger)
+        padding = 5
+        day_name_short = day_name[:3]
+        date_str = f"{date_obj.day}"
+        header_text = f"{day_name_short} {date_str}"
         text_x = x + padding
-        text_y = y + 8
-        self.draw_text(draw, date_header, text_x, text_y, self.fonts['large'], self.white)
+        text_y = y + 5
+        
+        # Draw day name and date inline
+        self.draw_text(draw, header_text, text_x, text_y, self.fonts['normal'], self.white)
 
-        # Draw weather icon and temperature right-aligned in header
+        # Draw weather icon and temperature centered below day/date
         if weather_info:
             icon, condition = self.get_weather_icon_for_date(weather_info, date_obj)
             
@@ -152,7 +156,7 @@ class WeekRenderer(BaseRenderer):
                 temp_str = f"{int(weather_info.temperature)}°"
             
             if icon or temp_str:
-                weather_icon_font = self.fonts.get('weather_small', self.fonts['small'])
+                weather_icon_font = self.fonts.get('weather_tiny', self.fonts['small'])
                 temp_font = self.fonts['small']
                 
                 # Measure widths separately
@@ -166,19 +170,19 @@ class WeekRenderer(BaseRenderer):
                     temp_bbox = draw.textbbox((0, 0), temp_str, font=temp_font)
                     temp_width = temp_bbox[2] - temp_bbox[0]
                 
-                # Position from right edge of cell (icon + space + temp)
-                total_width = icon_width + (8 if icon and temp_str else 0) + temp_width
-                weather_x = x + width - 10 - total_width
-                weather_y = y + 8
+                # Center weather display horizontally in the column
+                total_width = icon_width + (3 if icon and temp_str else 0) + temp_width
+                weather_x = x + (width - total_width) // 2
+                weather_y = y + 19
                 
                 # Draw icon first
                 if icon:
                     self.draw_text(draw, icon, weather_x, weather_y, weather_icon_font, self.white)
-                    weather_x += icon_width + 8
+                    weather_x += icon_width + 3
                 
                 # Draw temperature
                 if temp_str:
-                    self.draw_text(draw, temp_str, weather_x, weather_y + 2, temp_font, self.white)
+                    self.draw_text(draw, temp_str, weather_x, weather_y + 1, temp_font, self.white)
 
         # Draw events if any
         if day_events and day_events.events:

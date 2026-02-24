@@ -108,6 +108,7 @@ class BaseRenderer:
                 for path in font_paths['weather']:
                     self.logger.info(f"  Checking: {path} (exists: {os.path.exists(path)})")
                     if os.path.exists(path):
+                        fonts['weather_tiny'] = ImageFont.truetype(path, 14)
                         fonts['weather_small'] = ImageFont.truetype(path, 22)
                         fonts['weather_medium'] = ImageFont.truetype(path, 30)
                         fonts['weather_large'] = ImageFont.truetype(path, 38)
@@ -121,6 +122,7 @@ class BaseRenderer:
                     self.logger.info("If you have the weather icons font installed, provide the full path:")
                     self.logger.info("  Option 1: Add path to font_paths['weather'] in base_renderer.py")
                     self.logger.info("  Option 2: Copy font to: C:/Windows/Fonts/weathericons-regular-webfont.ttf")
+                    fonts['weather_tiny'] = fonts['small']
                     fonts['weather_small'] = fonts['normal']
                     fonts['weather_medium'] = fonts['medium']
                     fonts['weather_large'] = fonts['large']
