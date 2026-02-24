@@ -88,13 +88,21 @@ class MonthRenderer(BaseRenderer):
 
         # Calculate grid dimensions
         grid_y = header_height
-        row_height = (available_height - header_height) // 6
-        col_width = self.width // 7
-
-        # Calculate calendar start (Monday before or on first of month)
+        day_header_height = 20
+        
+        # Calculate minimum number of weeks needed to display current month
         first_day = date(year, month, 1)
         days_to_monday = first_day.weekday()  # 0=Monday
         calendar_start = first_day - timedelta(days=days_to_monday)
+        
+        last_day_of_month = date(year, month, last_day)
+        days_from_start_to_last = (last_day_of_month - calendar_start).days
+        weeks_needed = (days_from_start_to_last // 7) + 1
+        
+        # Calculate available space for calendar grid and stretch to fill it
+        grid_content_height = available_height - header_height - day_header_height
+        row_height = grid_content_height // weeks_needed  # Stretch rows to fill available space
+        col_width = self.width // 7
 
         # Draw day headers (Mon, Tue, Wed, Thu, Fri, Sat, Sun)
         day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -103,16 +111,11 @@ class MonthRenderer(BaseRenderer):
             x = i * col_width + col_width // 2
             self.draw_text(draw, day_name, x, header_y, self.fonts['medium'], self.black, align='center')
 
-        # Draw calendar grid - only show weeks that contain current month dates
-        grid_start_y = grid_y + 25
+        # Draw calendar grid - show only weeks needed, but stretched to fill space
+        grid_start_y = grid_y + day_header_height
         current_date = calendar_start
         
-        # Calculate minimum number of weeks needed
-        # Find which week the last day of month falls in
-        last_day_of_month = date(year, month, last_day)
-        days_from_start_to_last = (last_day_of_month - calendar_start).days
-        weeks_needed = (days_from_start_to_last // 7) + 1  # +1 because we need to include the week with last day
-
+        # Show only the weeks needed for current month
         for week in range(weeks_needed):
             for day_col in range(7):
                 x = day_col * col_width
