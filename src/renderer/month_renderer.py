@@ -40,35 +40,80 @@ class MonthRenderer(BaseRenderer):
         # Layout: Up to 6 rows (weeks) x 7 columns (days)
         footer_height = 40  # Footer with last updated time
         available_height = self.height - footer_height
-        row_height = available_height // 6
-        col_width = self.width // 7
-
+        
         # Get current month info
         today = date.today()
         year, month = today.year, today.month
         _, last_day = monthrange(year, month)
-
-        # Draw month name
+        
+        # Draw blue header with month name and 3-day forecast inline
+        header_height = 50
+        self.draw_box(draw, 0, 0, self.width, header_height, fill=self.blue)
+        
+        # Draw month name on left side
         month_name = today.strftime("%B %Y")
-        self.draw_text(draw, month_name, self.width // 2, y + 10, self.fonts['large'], self.black, align='center')
+        self.draw_text(draw, month_name, 20, y + 8, self.fonts['large'], self.white)
+        
+        # Draw 3-day forecast inline on right side
+        if weather_info and weather_info.forecast:
+            forecast_start_x = self.width - 160  # Right-aligned, leave room for 3 days
+            forecast_y = y + 8
+            forecast_item_width = 50  # Tight spacing for each forecast item
+            
+            for day_offset in range(3):
+                forecast_date = today + timedelta(days=day_offset)
+                date_key = forecast_date.isoformat()
+                forecast = weather_info.forecast.get(date_key)
+                
+                if forecast:
+                    from weather_data import WeatherDataProcessor
+                    weather_processor = WeatherDataProcessor()
+                    icon = weather_processor.get_weather_icon(forecast.condition.lower())
+                    temp_str = f"{int(forecast.temperature)}°"
+                    
+                    # Position for this day's forecast (compact, inline)
+                    x_pos = forecast_start_x + (day_offset * forecast_item_width)
+                    
+                    # Draw date label
+                    day_label = forecast_date.strftime("%a")
+                    self.draw_text(draw, day_label, x_pos, forecast_y, self.fonts['small'], self.white)
+                    
+                    # Draw icon (tiny, below date)
+                    weather_icon_font = self.fonts.get('weather_tiny', self.fonts['small'])
+                    if icon:
+                        self.draw_text(draw, icon, x_pos + 2, forecast_y + 12, weather_icon_font, self.white)
+                    
+                    # Draw temperature (inline with icon)
+                    self.draw_text(draw, temp_str, x_pos + 15, forecast_y + 14, self.fonts['small'], self.white)
 
-        # Draw day headers (Sun, Mon, Tue, etc.)
-        day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-        header_y = y + 45
-        for i, day_name in enumerate(day_names):
-            x = i * col_width + col_width // 2
-            self.draw_text(draw, day_name, x, header_y, self.fonts['medium'], self.black, align='center')
+        # Calculate grid dimensions
+        grid_y = header_height
+        row_height = (available_height - header_height) // 6
+        col_width = self.width // 7
 
         # Calculate calendar start (Monday before or on first of month)
         first_day = date(year, month, 1)
         days_to_monday = first_day.weekday()  # 0=Monday
         calendar_start = first_day - timedelta(days=days_to_monday)
 
-        # Draw calendar grid
-        grid_start_y = y + 70
-        current_date = calendar_start
+        # Draw day headers (Mon, Tue, Wed, Thu, Fri, Sat, Sun)
+        day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        header_y = grid_y + 3
+        for i, day_name in enumerate(day_names):
+            x = i * col_width + col_width // 2
+            self.draw_text(draw, day_name, x, header_y, self.fonts['medium'], self.black, align='center')
 
-        for week in range(6):  # Up to 6 weeks in a month view
+        # Draw calendar grid - only show weeks that contain current month dates
+        grid_start_y = grid_y + 25
+        current_date = calendar_start
+        
+        # Calculate minimum number of weeks needed
+        # Find which week the last day of month falls in
+        last_day_of_month = date(year, month, last_day)
+        days_from_start_to_last = (last_day_of_month - calendar_start).days
+        weeks_needed = (days_from_start_to_last // 7) + 1  # +1 because we need to include the week with last day
+
+        for week in range(weeks_needed):
             for day_col in range(7):
                 x = day_col * col_width
                 y = grid_start_y + (week * row_height)
@@ -77,7 +122,7 @@ class MonthRenderer(BaseRenderer):
                 in_current_month = (current_date.month == month)
                 is_today = (current_date == today)
 
-                # Draw cell
+                # Draw cell (no weather on today)
                 self._draw_day_cell(
                     draw,
                     x,
@@ -88,7 +133,7 @@ class MonthRenderer(BaseRenderer):
                     events_by_day.get(current_date),
                     is_today,
                     in_current_month,
-                    weather_info if is_today else None
+                    None
                 )
 
                 current_date += timedelta(days=1)
@@ -188,8 +233,14 @@ class MonthRenderer(BaseRenderer):
         else:
             # Draw date number
             padding = 5
-            date_str = str(date_obj.day)
-            text_color = self.black if in_current_month else self.black
+            
+            # Show "1 Mar" format for next month dates (e.g., if March 1st is shown in Feb calendar)
+            if not in_current_month and date_obj.day == 1:
+                date_str = f"{date_obj.day} {date_obj.strftime('%b')}"
+                text_color = self.black
+            else:
+                date_str = str(date_obj.day)
+                text_color = self.black if in_current_month else self.black
             
             self.draw_text(draw, date_str, x + padding, y + padding, self.fonts['medium'], text_color)
 
