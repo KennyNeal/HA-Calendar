@@ -83,8 +83,8 @@ class MonthRenderer(BaseRenderer):
                     if icon:
                         self.draw_text(draw, icon, x_pos + 2, forecast_y + 12, weather_icon_font, self.white)
                     
-                    # Draw temperature (inline with icon)
-                    self.draw_text(draw, temp_str, x_pos + 15, forecast_y + 14, self.fonts['small'], self.white)
+                    # Draw temperature (inline with icon, with more spacing)
+                    self.draw_text(draw, temp_str, x_pos + 22, forecast_y + 14, self.fonts['small'], self.white)
 
         # Calculate grid dimensions
         grid_y = header_height
