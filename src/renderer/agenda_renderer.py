@@ -32,13 +32,12 @@ class AgendaRenderer(BaseRenderer):
         """
         image, draw = self.create_canvas()
 
-        # Draw header with weather
-        header_height = 50
-        y = self.draw_header(draw, weather_info, header_height)
+        # No header - content extends to top
+        y = 0
 
         # Calculate available space
         footer_height = 40  # Footer with last updated time
-        available_height = self.height - header_height - footer_height
+        available_height = self.height - footer_height
         content_y = y + 10
 
         # Draw agenda title
@@ -69,7 +68,7 @@ class AgendaRenderer(BaseRenderer):
                 continue  # Skip days with no events
 
             # Check if we have space for this day's events
-            if content_y + line_height + (len(day_events.events) * line_height) > header_height + available_height:
+            if content_y + line_height + (len(day_events.events) * line_height) > available_height:
                 # No more space, show "..." and break
                 self.draw_text(
                     draw,

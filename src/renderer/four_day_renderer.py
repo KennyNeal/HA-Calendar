@@ -32,14 +32,13 @@ class FourDayRenderer(BaseRenderer):
         """
         image, draw = self.create_canvas()
 
-        # Draw header with weather
-        header_height = 50
-        y = self.draw_header(draw, weather_info, header_height)
+        # No header - grid extends to top
+        y = 0
 
         # Calculate column dimensions
         # Layout: 4 columns (4 days)
         footer_height = 40  # Footer with last updated time
-        available_height = self.height - header_height - footer_height
+        available_height = self.height - footer_height
         col_width = self.width // 4
 
         # Get today's date
@@ -69,7 +68,8 @@ class FourDayRenderer(BaseRenderer):
                 events_by_day.get(current_date),
                 is_today,
                 all_day_height,
-                span_keys
+                span_keys,
+                weather_info
             )
 
         # Draw footer with last updated time
@@ -78,7 +78,7 @@ class FourDayRenderer(BaseRenderer):
         self.logger.info("Rendered 4-day view")
         return image
 
-    def _draw_day_column(self, draw, x, y, width, height, date_obj, day_events, is_today, all_day_height, span_keys):
+    def _draw_day_column(self, draw, x, y, width, height, date_obj, day_events, is_today, all_day_height, span_keys, weather_info=None):
         """
         Draw a single day column.
 
@@ -91,34 +91,85 @@ class FourDayRenderer(BaseRenderer):
             date_obj: Date object for this column
             day_events: DayEvents object or None
             is_today: Boolean indicating if this is today
+            all_day_height: Height of all-day event lanes
+            span_keys: Set of span event keys
+            weather_info: WeatherInfo object for today's weather (for first column only)
         """
         # Draw column border
         border_width = 1
         self.draw_box(draw, x, y, width, height, outline=self.black, outline_width=border_width)
 
-        # Note: No highlight for today since it's always the first column
+        # Draw blue header background bar (height 50)
+        header_height = 50
+        self.draw_box(draw, x + 1, y + 1, width - 2, header_height - 2, fill=self.blue)
 
-        # Draw day name and date
+        # Draw day name and date in white on blue background
         day_name = date_obj.strftime("%A")
         date_str = date_obj.strftime("%b %d")
 
         padding = 5
         text_x = x + padding
+        text_y = y + 5
 
-        # Day name (larger)
-        self.draw_text(draw, day_name, text_x, y + padding, self.fonts['large'], self.black)
+        # Day name (larger, white)
+        self.draw_text(draw, day_name, text_x, text_y, self.fonts['large'], self.white)
 
-        # Date (smaller, below day name)
-        self.draw_text(draw, date_str, text_x, y + padding + 25, self.fonts['medium'], self.black)
+        # Date (smaller, below day name, white)
+        self.draw_text(draw, date_str, text_x, text_y + 22, self.fonts['medium'], self.white)
+
+        # Draw weather icon and temperature right-aligned in header
+        if weather_info:
+            icon, condition = self.get_weather_icon_for_date(weather_info, date_obj)
+            
+            # Get temperature for this date from forecast dict
+            temp_str = None
+            if weather_info and weather_info.forecast:
+                date_key = date_obj.isoformat()
+                forecast = weather_info.forecast.get(date_key)
+                if forecast and forecast.temperature:
+                    temp_str = f"{int(forecast.temperature)}°"
+            
+            # Fallback to current temperature if no forecast available
+            if not temp_str and weather_info and weather_info.temperature:
+                temp_str = f"{int(weather_info.temperature)}°"
+            
+            if icon or temp_str:
+                weather_icon_font = self.fonts.get('weather_medium', self.fonts['medium'])
+                temp_font = self.fonts['medium']
+                
+                # Measure widths separately
+                icon_width = 0
+                if icon:
+                    icon_bbox = draw.textbbox((0, 0), icon, font=weather_icon_font)
+                    icon_width = icon_bbox[2] - icon_bbox[0]
+                
+                temp_width = 0
+                if temp_str:
+                    temp_bbox = draw.textbbox((0, 0), temp_str, font=temp_font)
+                    temp_width = temp_bbox[2] - temp_bbox[0]
+                
+                # Position from right edge of column (icon + space + temp)
+                total_width = icon_width + (8 if icon and temp_str else 0) + temp_width
+                weather_x = x + width - 5 - total_width
+                weather_y = y + 8
+                
+                # Draw icon first
+                if icon:
+                    self.draw_text(draw, icon, weather_x, weather_y, weather_icon_font, self.white)
+                    weather_x += icon_width + 8
+                
+                # Draw temperature
+                if temp_str:
+                    self.draw_text(draw, temp_str, weather_x, weather_y + 2, temp_font, self.white)
 
         # Draw events if any
         if day_events and day_events.events:
             self._draw_events_in_column(
                 draw,
                 text_x,
-                y + 60 + all_day_height,  # Start below the date and all-day spans
+                y + header_height + all_day_height,  # Start below the header and all-day spans
                 width - (2 * padding),
-                height - 65 - all_day_height,
+                height - header_height - all_day_height - 2,
                 day_events,
                 span_keys
             )

@@ -70,6 +70,7 @@ class BaseRenderer:
                 'C:/Windows/Fonts/arialbd.ttf',
             ],
             'weather': [
+                'C:/Users/kneal/AppData/Local/Microsoft/Windows/Fonts/weathericons-regular-webfont.ttf',
                 '/usr/share/fonts/truetype/weather-icons/weathericons-regular-webfont.ttf',
                 'C:/Windows/Fonts/weathericons-regular-webfont.ttf'
             ]
@@ -103,16 +104,25 @@ class BaseRenderer:
                 
                 # Try to load weather icons font
                 weather_font_loaded = False
+                self.logger.info(f"Looking for weather icons font in:")
                 for path in font_paths['weather']:
+                    self.logger.info(f"  Checking: {path} (exists: {os.path.exists(path)})")
                     if os.path.exists(path):
+                        fonts['weather_tiny'] = ImageFont.truetype(path, 14)
                         fonts['weather_small'] = ImageFont.truetype(path, 22)
                         fonts['weather_medium'] = ImageFont.truetype(path, 30)
                         fonts['weather_large'] = ImageFont.truetype(path, 38)
                         weather_font_loaded = True
+                        self.logger.info(f"  [+] Found weather icons font at: {path}")
                         break
                 
                 if not weather_font_loaded:
                     self.logger.warning("Weather Icons font not found, weather icons may not render correctly")
+                    # Check if font might be in a different location
+                    self.logger.info("If you have the weather icons font installed, provide the full path:")
+                    self.logger.info("  Option 1: Add path to font_paths['weather'] in base_renderer.py")
+                    self.logger.info("  Option 2: Copy font to: C:/Windows/Fonts/weathericons-regular-webfont.ttf")
+                    fonts['weather_tiny'] = fonts['small']
                     fonts['weather_small'] = fonts['normal']
                     fonts['weather_medium'] = fonts['medium']
                     fonts['weather_large'] = fonts['large']
@@ -150,6 +160,32 @@ class BaseRenderer:
         image = Image.new('RGB', (self.width, self.height), self.white)
         draw = ImageDraw.Draw(image)
         return image, draw
+
+    def get_weather_icon_for_date(self, weather_info, date_obj):
+        """
+        Get weather icon for a specific date if forecast is available.
+
+        Args:
+            weather_info: WeatherInfo object or None
+            date_obj: date object
+
+        Returns:
+            tuple: (icon_str, condition_str) or (None, None) if no forecast available
+        """
+        if not weather_info or not weather_info.forecast:
+            return None, None
+        
+        date_key = date_obj.isoformat()  # YYYY-MM-DD format
+        forecast = weather_info.forecast.get(date_key)
+        
+        if not forecast:
+            return None, None
+        
+        from weather_data import WeatherDataProcessor
+        weather_processor = WeatherDataProcessor()
+        icon = weather_processor.get_weather_icon(forecast.condition.lower())
+        
+        return icon, forecast.condition
 
     def draw_text(self, draw, text, x, y, font, color, max_width=None, align='left'):
         """
