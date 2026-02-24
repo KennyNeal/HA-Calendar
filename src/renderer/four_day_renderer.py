@@ -135,24 +135,32 @@ class FourDayRenderer(BaseRenderer):
             
             if icon or temp_str:
                 weather_icon_font = self.fonts.get('weather_medium', self.fonts['medium'])
+                temp_font = self.fonts['medium']
                 
-                # Prepare text string: icon (if available) + temperature
-                weather_display = ""
+                # Measure widths separately
+                icon_width = 0
                 if icon:
-                    weather_display = icon + " "
+                    icon_bbox = draw.textbbox((0, 0), icon, font=weather_icon_font)
+                    icon_width = icon_bbox[2] - icon_bbox[0]
+                
+                temp_width = 0
                 if temp_str:
-                    weather_display += temp_str
+                    temp_bbox = draw.textbbox((0, 0), temp_str, font=temp_font)
+                    temp_width = temp_bbox[2] - temp_bbox[0]
                 
-                # Measure width
-                display_bbox = draw.textbbox((0, 0), weather_display, font=weather_icon_font)
-                display_width = display_bbox[2] - display_bbox[0]
-                
-                # Position from right edge of column
-                weather_x = x + width - 5 - display_width
+                # Position from right edge of column (icon + space + temp)
+                total_width = icon_width + (8 if icon and temp_str else 0) + temp_width
+                weather_x = x + width - 5 - total_width
                 weather_y = y + 8
                 
-                # Draw weather info
-                self.draw_text(draw, weather_display, weather_x, weather_y, weather_icon_font, self.white)
+                # Draw icon first
+                if icon:
+                    self.draw_text(draw, icon, weather_x, weather_y, weather_icon_font, self.white)
+                    weather_x += icon_width + 8
+                
+                # Draw temperature
+                if temp_str:
+                    self.draw_text(draw, temp_str, weather_x, weather_y + 2, temp_font, self.white)
 
         # Draw events if any
         if day_events and day_events.events:

@@ -70,6 +70,7 @@ class BaseRenderer:
                 'C:/Windows/Fonts/arialbd.ttf',
             ],
             'weather': [
+                'C:/Users/kneal/AppData/Local/Microsoft/Windows/Fonts/weathericons-regular-webfont.ttf',
                 '/usr/share/fonts/truetype/weather-icons/weathericons-regular-webfont.ttf',
                 'C:/Windows/Fonts/weathericons-regular-webfont.ttf'
             ]
@@ -103,16 +104,23 @@ class BaseRenderer:
                 
                 # Try to load weather icons font
                 weather_font_loaded = False
+                self.logger.info(f"Looking for weather icons font in:")
                 for path in font_paths['weather']:
+                    self.logger.info(f"  Checking: {path} (exists: {os.path.exists(path)})")
                     if os.path.exists(path):
                         fonts['weather_small'] = ImageFont.truetype(path, 22)
                         fonts['weather_medium'] = ImageFont.truetype(path, 30)
                         fonts['weather_large'] = ImageFont.truetype(path, 38)
                         weather_font_loaded = True
+                        self.logger.info(f"  [+] Found weather icons font at: {path}")
                         break
                 
                 if not weather_font_loaded:
                     self.logger.warning("Weather Icons font not found, weather icons may not render correctly")
+                    # Check if font might be in a different location
+                    self.logger.info("If you have the weather icons font installed, provide the full path:")
+                    self.logger.info("  Option 1: Add path to font_paths['weather'] in base_renderer.py")
+                    self.logger.info("  Option 2: Copy font to: C:/Windows/Fonts/weathericons-regular-webfont.ttf")
                     fonts['weather_small'] = fonts['normal']
                     fonts['weather_medium'] = fonts['medium']
                     fonts['weather_large'] = fonts['large']
