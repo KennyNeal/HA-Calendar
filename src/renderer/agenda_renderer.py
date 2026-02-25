@@ -32,26 +32,26 @@ class AgendaRenderer(BaseRenderer):
         """
         image, draw = self.create_canvas()
 
-        # No header - content extends to top
         y = 0
 
-        # Calculate available space
+        # Header and footer layout
+        header_height = 50
         footer_height = 40  # Footer with last updated time
-        available_height = self.height - footer_height
-        content_y = y + 10
+        content_top = header_height + 10
+        content_bottom = self.height - footer_height
+        content_y = content_top
 
-        # Draw agenda title
+        # Draw blue header bar with title
+        self.draw_box(draw, 0, y, self.width, header_height, fill=self.blue)
         self.draw_text(
             draw,
             "Upcoming Events",
             self.width // 2,
-            content_y,
+            y + 12,
             self.fonts['large'],
-            self.black,
+            self.white,
             align='center'
         )
-
-        content_y += 35
 
         # Get sorted dates
         sorted_dates = sorted(events_by_day.keys())
@@ -68,7 +68,7 @@ class AgendaRenderer(BaseRenderer):
                 continue  # Skip days with no events
 
             # Check if we have space for this day's events
-            if content_y + line_height + (len(day_events.events) * line_height) > available_height:
+            if content_y + line_height + (len(day_events.events) * line_height) > content_bottom:
                 # No more space, show "..." and break
                 self.draw_text(
                     draw,
@@ -110,7 +110,7 @@ class AgendaRenderer(BaseRenderer):
 
             # Draw events for this day
             for event in day_events.events:
-                if content_y + line_height > available_height:
+                if content_y + line_height > content_bottom:
                     break  # No more space
 
                 # Draw colored indicator
