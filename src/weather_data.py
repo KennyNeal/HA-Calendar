@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
 from utils.logger import get_logger
 
 
@@ -23,6 +24,7 @@ class WeatherInfo:
     humidity: int
     wind_speed: float
     wind_speed_unit: str
+    wind_bearing: Optional[float] = None
     forecast: dict = None  # Maps date string (YYYY-MM-DD) to DayForecast
 
 
@@ -79,6 +81,25 @@ class WeatherDataProcessor:
             humidity = attributes.get('humidity', 0)
             wind_speed = attributes.get('wind_speed', 0)
             wind_speed_unit = attributes.get('wind_speed_unit', 'mph')
+            wind_bearing = attributes.get('wind_bearing')
+            if wind_bearing is None:
+                wind_bearing = attributes.get('wind_direction')
+            if isinstance(wind_bearing, str):
+                cardinal_map = {
+                    'N': 0.0,
+                    'NE': 45.0,
+                    'E': 90.0,
+                    'SE': 135.0,
+                    'S': 180.0,
+                    'SW': 225.0,
+                    'W': 270.0,
+                    'NW': 315.0,
+                }
+                wind_bearing = cardinal_map.get(wind_bearing.strip().upper())
+            try:
+                wind_bearing = float(wind_bearing) if wind_bearing is not None else None
+            except (TypeError, ValueError):
+                wind_bearing = None
 
             # Extract and parse forecast data
             forecast_dict = {}
@@ -182,6 +203,7 @@ class WeatherDataProcessor:
                 humidity=humidity,
                 wind_speed=wind_speed,
                 wind_speed_unit=wind_speed_unit,
+                wind_bearing=wind_bearing,
                 forecast=forecast_dict if forecast_dict else None
             )
 
