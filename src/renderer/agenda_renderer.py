@@ -39,6 +39,11 @@ class AgendaRenderer(BaseRenderer):
         footer_height = 40  # Footer with last updated time
         content_top = header_height + 10
         content_bottom = self.height - footer_height
+
+        # Split main content area (left: agenda, right: weather)
+        left_width = int(self.width * 0.7)
+        right_x = left_width
+        right_width = self.width - right_x
         content_y = content_top
 
         # Draw blue header bar with title
@@ -53,32 +58,22 @@ class AgendaRenderer(BaseRenderer):
             align='center'
         )
 
+        # Draw divider between agenda and weather panel
+        draw.line([(right_x, header_height), (right_x, content_bottom)], fill=self.black, width=2)
+
         # Get sorted dates
         sorted_dates = sorted(events_by_day.keys())
 
         # Draw events chronologically
         line_height = 24
         padding = 20
-        max_width = self.width - (2 * padding)
+        max_width = left_width - (2 * padding)
 
         for event_date in sorted_dates:
             day_events = events_by_day[event_date]
 
             if not day_events.events:
                 continue  # Skip days with no events
-
-            # Check if we have space for this day's events
-            if content_y + line_height + (len(day_events.events) * line_height) > content_bottom:
-                # No more space, show "..." and break
-                self.draw_text(
-                    draw,
-                    "... (more events not shown)",
-                    padding,
-                    content_y,
-                    self.fonts['normal'],
-                    self.black
-                )
-                break
 
             # Draw date header
             if day_events.is_today:
@@ -135,21 +130,131 @@ class AgendaRenderer(BaseRenderer):
                     time_str = event.start.strftime("%I:%M %p")
                     event_text = f"{time_str} - {event.title} ({event.calendar_name})"
 
-                # Draw event text
-                self.draw_text(
-                    draw,
+                # Draw wrapped event text
+                text_lines = self.wrap_text(
                     event_text,
-                    text_x,
-                    content_y,
+                    max_width - (text_x - padding),
                     self.fonts['normal'],
-                    self.black,
-                    max_width=max_width - (text_x - padding)
+                    draw,
+                    max_lines=2
                 )
 
-                content_y += line_height
+                required_height = line_height * len(text_lines)
+                if content_y + required_height > content_bottom:
+                    self.draw_text(
+                        draw,
+                        "... (more events not shown)",
+                        padding,
+                        content_y,
+                        self.fonts['normal'],
+                        self.black
+                    )
+                    content_y = content_bottom
+                    break
+
+                for line in text_lines:
+                    self.draw_text(
+                        draw,
+                        line,
+                        text_x,
+                        content_y,
+                        self.fonts['normal'],
+                        self.black
+                    )
+                    content_y += line_height
 
             # Add spacing between days
-            content_y += 10
+            content_y += 6
+
+            if content_y >= content_bottom:
+                break
+
+        # Draw weather station panel on the right
+        weather_top = content_top + 5
+        weather_x_center = right_x + (right_width // 2)
+        weather_y = weather_top
+
+        if weather_info:
+            from weather_data import WeatherDataProcessor
+            weather_processor = WeatherDataProcessor()
+
+            icon = weather_processor.get_weather_icon(weather_info.condition.lower())
+            temp_str = f"{weather_info.temperature:.0f}{weather_info.temperature_unit}"
+
+            icon_font = self.fonts.get('weather_large', self.fonts['xlarge'])
+            temp_font = self.fonts['xlarge']
+
+            icon_bbox = draw.textbbox((0, 0), icon, font=icon_font) if icon else (0, 0, 0, 0)
+            icon_width = icon_bbox[2] - icon_bbox[0]
+            temp_bbox = draw.textbbox((0, 0), temp_str, font=temp_font)
+            temp_width = temp_bbox[2] - temp_bbox[0]
+
+            gap = 10 if icon else 0
+            total_width = icon_width + gap + temp_width
+            start_x = weather_x_center - (total_width // 2)
+
+            if icon:
+                self.draw_text(draw, icon, start_x, weather_y, icon_font, self.black)
+            self.draw_text(draw, temp_str, start_x + icon_width + gap, weather_y + 6, temp_font, self.black)
+
+            weather_y += 80
+
+            wind_arrow = self._bearing_to_arrow(weather_info.wind_bearing)
+            wind_suffix = f" {wind_arrow}" if wind_arrow else ""
+            details = [
+                f"Condition: {weather_info.condition}",
+                f"Humidity: {weather_info.humidity}%",
+                f"Wind: {weather_info.wind_speed:.0f} {weather_info.wind_speed_unit}{wind_suffix}",
+            ]
+
+            for detail in details:
+                self.draw_text(
+                    draw,
+                    detail,
+                    right_x + 12,
+                    weather_y,
+                    self.fonts['medium'],
+                    self.black,
+                    max_width=right_width - 24
+                )
+                weather_y += 26
+        else:
+            self.draw_text(
+                draw,
+                "Weather Unavailable",
+                weather_x_center,
+                weather_y,
+                self.fonts['medium'],
+                self.black,
+                align='center'
+            )
+            weather_y += 40
+
+        # 3-day forecast (today + next 2 days)
+        forecast_y = weather_y + 16
+        forecast_item_width = right_width // 3
+        if weather_info and weather_info.forecast:
+            today = date.today()
+            for day_offset in range(3):
+                forecast_date = today + timedelta(days=day_offset)
+                date_key = forecast_date.isoformat()
+                forecast = weather_info.forecast.get(date_key)
+                if not forecast:
+                    continue
+
+                from weather_data import WeatherDataProcessor
+                weather_processor = WeatherDataProcessor()
+                icon = weather_processor.get_weather_icon(forecast.condition.lower())
+                temp_str = f"{int(forecast.temperature)}°"
+
+                x_pos = right_x + (day_offset * forecast_item_width) + (forecast_item_width // 2)
+                day_label = forecast_date.strftime("%a")
+
+                self.draw_text(draw, day_label, x_pos, forecast_y, self.fonts['medium'], self.black, align='center')
+                if icon:
+                    weather_icon_font = self.fonts.get('weather_small', self.fonts['medium'])
+                    self.draw_text(draw, icon, x_pos, forecast_y + 18, weather_icon_font, self.black, align='center')
+                self.draw_text(draw, temp_str, x_pos, forecast_y + 46, self.fonts['medium'], self.black, align='center')
 
         # Draw footer with last updated time
         self.draw_footer(draw, self.height - footer_height, footer_height, footer_sensor_text)
@@ -158,3 +263,24 @@ class AgendaRenderer(BaseRenderer):
 
         self.logger.info("Rendered agenda list view")
         return image
+
+    def _bearing_to_arrow(self, bearing):
+        if bearing is None:
+            return ""
+
+        direction = bearing % 360
+        if 22.5 <= direction < 67.5:
+            return "^>"
+        if 67.5 <= direction < 112.5:
+            return ">"
+        if 112.5 <= direction < 157.5:
+            return "v>"
+        if 157.5 <= direction < 202.5:
+            return "v"
+        if 202.5 <= direction < 247.5:
+            return "<v"
+        if 247.5 <= direction < 292.5:
+            return "<"
+        if 292.5 <= direction < 337.5:
+            return "^<"
+        return "^"
