@@ -110,7 +110,7 @@ class AgendaRenderer(BaseRenderer):
 
             # Draw events for this day
             for event in day_events.events:
-                if content_y + line_height > header_height + available_height:
+                if content_y + line_height > available_height:
                     break  # No more space
 
                 # Draw colored indicator
