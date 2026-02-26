@@ -78,6 +78,51 @@ class AgendaRenderer(BaseRenderer):
             if not day_events.events:
                 continue  # Skip days with no events
 
+            # Filter past events for today
+            events_to_show = []
+            for event in day_events.events:
+                # If today, skip events that have already passed
+                if day_events.is_today and not event.all_day:
+                    # Handle both timezone-aware and timezone-naive datetimes
+                    current_time = datetime.now(event.start.tzinfo) if event.start.tzinfo else datetime.now()
+                    if event.start < current_time:
+                        continue
+                events_to_show.append(event)
+
+            if not events_to_show:
+                continue  # Skip if no events to show
+
+            # Check if this is today or tomorrow
+            is_tomorrow = event_date == date.today() + timedelta(days=1)
+            
+            # For days other than today/tomorrow, check if we can show all events
+            if not day_events.is_today and not is_tomorrow:
+                # Calculate space needed for this day
+                text_x = padding + 10 + 10 + 10  # padding + indicator position + indicator size + gap
+                space_needed = line_height + 5  # date header with underline
+                
+                for event in events_to_show:
+                    if event.all_day:
+                        event_text = f"{event.title} (All Day)"
+                    else:
+                        time_str = event.start.strftime("%I:%M %p")
+                        event_text = f"{time_str} - {event.title}"
+                    
+                    text_lines = self.wrap_text(
+                        event_text,
+                        max_width - (text_x - padding),
+                        self.fonts['normal'],
+                        draw,
+                        max_lines=2
+                    )
+                    space_needed += line_height * len(text_lines)
+                
+                space_needed += 6  # spacing between days
+                
+                # Skip this day if we can't show all events
+                if content_y + space_needed > content_bottom:
+                    continue
+
             # Draw date header
             if day_events.is_today:
                 date_str = f"TODAY - {event_date.strftime('%A, %B %d')}"
@@ -107,7 +152,7 @@ class AgendaRenderer(BaseRenderer):
             content_y += line_height + 5
 
             # Draw events for this day
-            for event in day_events.events:
+            for event in events_to_show:
                 if content_y + line_height > content_bottom:
                     break  # No more space
 
