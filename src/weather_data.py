@@ -107,7 +107,7 @@ class WeatherDataProcessor:
             
             # First try forecast service data (preferred - has multi-day forecasts)
             if forecast_service_data:
-                self.logger.info(f"Processing forecast service data with {len(forecast_service_data)} entities")
+                self.logger.debug(f"Processing forecast service data with {len(forecast_service_data)} entities")
                 
                 # Extract forecast from service response
                 # forecast_service_data is dict with entity_id as key
@@ -125,11 +125,11 @@ class WeatherDataProcessor:
                     # Check if entity_data is a dict with 'forecast' key
                     if isinstance(entity_data, dict) and 'forecast' in entity_data:
                         forecasts_list = entity_data.get('forecast', [])
-                        self.logger.info(f"  Entity has forecast key with {len(forecasts_list)} items")
+                        self.logger.debug(f"  Entity has forecast key with {len(forecasts_list)} items")
                     elif isinstance(entity_data, list):
                         # Forecast data is directly an array
                         forecasts_list = entity_data
-                        self.logger.info(f"  Entity is direct array with {len(forecasts_list)} items")
+                        self.logger.debug(f"  Entity is direct array with {len(forecasts_list)} items")
                     
                     if forecasts_list:
                         for i, forecast_item in enumerate(forecasts_list):
@@ -152,7 +152,7 @@ class WeatherDataProcessor:
                                 )
                                 forecast_dict[date_key] = day_forecast
                                 if i < 5:
-                                    self.logger.info(f"  Forecast {i}: {date_key} -> {day_forecast.condition} ({day_forecast.temperature}°)")
+                                    self.logger.debug(f"  Forecast {i}: {date_key} -> {day_forecast.condition} ({day_forecast.temperature}°)")
             
             # If no forecast from service, try entity attributes
             if not forecast_dict:
