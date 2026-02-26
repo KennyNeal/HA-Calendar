@@ -13,6 +13,7 @@ class DayForecast:
     condition: str
     temperature: float
     wind_speed: float
+    temperature_low: Optional[float] = None
 
 
 @dataclass
@@ -146,7 +147,8 @@ class WeatherDataProcessor:
                                     date=date_key,
                                     condition=forecast_item.get('condition', 'unknown'),
                                     temperature=forecast_item.get('temperature', 0),
-                                    wind_speed=forecast_item.get('wind_speed', 0)
+                                    wind_speed=forecast_item.get('wind_speed', 0),
+                                    temperature_low=forecast_item.get('templow')
                                 )
                                 forecast_dict[date_key] = day_forecast
                                 if i < 5:
@@ -179,7 +181,8 @@ class WeatherDataProcessor:
                                 date=date_key,
                                 condition=forecast_item.get('condition', 'unknown'),
                                 temperature=forecast_item.get('temperature', 0),
-                                wind_speed=forecast_item.get('wind_speed', 0)
+                                wind_speed=forecast_item.get('wind_speed', 0),
+                                temperature_low=forecast_item.get('templow')
                             )
                             forecast_dict[date_key] = day_forecast
                             self.logger.debug(f"Forecast {i}: {date_key} -> {day_forecast.condition}")
