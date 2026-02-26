@@ -329,7 +329,7 @@ class AgendaRenderer(BaseRenderer):
                         self.draw_text_with_outline(draw, icon, x_pos, row_y + 24, weather_icon_font, icon_rgb, align='center')
                     else:
                         self.draw_text(draw, icon, x_pos, row_y + 24, weather_icon_font, icon_rgb, align='center')
-                self.draw_text(draw, temp_str, x_pos, row_y + 60, self.fonts['medium'], self.black, align='center')
+                self.draw_text(draw, temp_str, x_pos, row_y + 72, self.fonts['medium'], self.black, align='center')
 
         # Draw footer with last updated time and calendar legend
         footer_y = self.height - footer_height
