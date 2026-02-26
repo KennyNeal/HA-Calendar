@@ -122,12 +122,12 @@ def main():
         assigned_colors = color_manager.assign_calendar_colors(config['calendars'])
 
         # Debug: Log calendar color assignments
-        logger.info("Calendar color assignments from config:")
+        logger.debug("Calendar color assignments from config:")
         for calendar in config['calendars']:
-            logger.info(f"  {calendar['entity_id']}: color={calendar.get('color', 'auto')}")
-        logger.info("ColorManager assigned colors:")
+            logger.debug(f"  {calendar['entity_id']}: color={calendar.get('color', 'auto')}")
+        logger.debug("ColorManager assigned colors:")
         for entity_id, color_info in assigned_colors.items():
-            logger.info(f"  {entity_id}: {color_info['name']} RGB{color_info['rgb']}")
+            logger.debug(f"  {entity_id}: {color_info['name']} RGB{color_info['rgb']}")
 
         ha_client = HomeAssistantClient(config)
         calendar_processor = CalendarDataProcessor(color_manager)
@@ -166,10 +166,10 @@ def main():
             # Try to get forecast data from the weather service
             forecast_data = None
             try:
-                logger.info("Calling weather.get_forecasts service...")
+                logger.debug("Calling weather.get_forecasts service...")
                 forecast_data = ha_client.get_weather_forecast()
                 if forecast_data:
-                    logger.info("Forecast service retrieved successfully")
+                    logger.debug("Forecast service retrieved successfully")
             except Exception as e:
                 logger.warning(f"Weather forecast service error: {e}")
             
@@ -180,7 +180,7 @@ def main():
                     sensor_data = futures['footer'].result()
                     sensor_value = sensor_data.get('state', 'Unknown')
                     footer_sensor_text = f"{sensor_label}: {sensor_value}"
-                    logger.info(f"Footer sensor value: {footer_sensor_text}")
+                    logger.debug(f"Footer sensor value: {footer_sensor_text}")
                 except Exception as e:
                     logger.warning(f"Failed to fetch footer sensor {sensor_entity_id}: {e}")
 
@@ -203,7 +203,7 @@ def main():
         all_events = ha_client.get_all_calendar_events(start_date, end_date)
 
         # Process calendar events
-        logger.info("Processing calendar events...")
+        logger.debug("Processing calendar events...")
         parsed_events = calendar_processor.parse_all_events(all_events)
 
         # Group events by day

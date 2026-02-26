@@ -83,7 +83,7 @@ class BaseRenderer:
         for path in font_paths['regular']:
             if os.path.exists(path):
                 regular_font = path
-                self.logger.info(f"Using font: {os.path.basename(path)}")
+                self.logger.debug(f"Using font: {os.path.basename(path)}")
                 break
 
         # Find best available bold font
@@ -104,16 +104,16 @@ class BaseRenderer:
                 
                 # Try to load weather icons font
                 weather_font_loaded = False
-                self.logger.info(f"Looking for weather icons font in:")
+                self.logger.debug(f"Looking for weather icons font in:")
                 for path in font_paths['weather']:
-                    self.logger.info(f"  Checking: {path} (exists: {os.path.exists(path)})")
+                    self.logger.debug(f"  Checking: {path} (exists: {os.path.exists(path)})")
                     if os.path.exists(path):
                         fonts['weather_tiny'] = ImageFont.truetype(path, 14)
                         fonts['weather_small'] = ImageFont.truetype(path, 22)
                         fonts['weather_medium'] = ImageFont.truetype(path, 30)
                         fonts['weather_large'] = ImageFont.truetype(path, 38)
                         weather_font_loaded = True
-                        self.logger.info(f"  [+] Found weather icons font at: {path}")
+                        self.logger.debug(f"  [+] Found weather icons font at: {path}")
                         break
                 
                 if not weather_font_loaded:

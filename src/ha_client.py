@@ -148,7 +148,7 @@ class HomeAssistantClient:
                 
                 # Log all available attributes
                 self.logger.info(f"Weather state: {state}")
-                self.logger.info(f"Weather attributes keys: {list(attributes.keys())}")
+                self.logger.debug(f"Weather attributes keys: {list(attributes.keys())}")
                 
                 # Log full attributes for debugging
                 self.logger.debug(f"Full weather attributes: {attributes}")
@@ -171,7 +171,7 @@ class HomeAssistantClient:
                         date_key = f.get('date') or f.get('datetime') or f.get('date_attr')
                         condition = f.get('condition', 'N/A')
                         temp = f.get('temperature', 'N/A')
-                        self.logger.info(f"  Forecast {i}: {date_key} -> {condition} ({temp}°)")
+                        self.logger.debug(f"  Forecast {i}: {date_key} -> {condition} ({temp}°)")
                     else:
                         self.logger.debug(f"  Forecast {i}: {f}")
             else:
@@ -205,15 +205,15 @@ class HomeAssistantClient:
                 "type": "daily"
             }
             
-            self.logger.info(f"  Request URL: {url}")
-            self.logger.info(f"  Payload: {payload}")
+            self.logger.debug(f"  Request URL: {url}")
+            self.logger.debug(f"  Payload: {payload}")
             
             response = self._retry_request('post', url, json=payload, headers=self._get_headers())
             result = response.json()
             
-            self.logger.info(f"Forecast service raw response type: {type(result).__name__}")
+            self.logger.debug(f"Forecast service raw response type: {type(result).__name__}")
             if isinstance(result, dict):
-                self.logger.info(f"  Response keys: {list(result.keys())}")
+                self.logger.debug(f"  Response keys: {list(result.keys())}")
             
             self.logger.debug(f"Full response: {result}")
             
@@ -223,28 +223,28 @@ class HomeAssistantClient:
             # Check if wrapped in 'service_response'
             if isinstance(result, dict) and 'service_response' in result:
                 forecast_response = result.get('service_response', {})
-                self.logger.info(f"Extracted from 'service_response' wrapper")
+                self.logger.debug(f"Extracted from 'service_response' wrapper")
             elif isinstance(result, dict) and result.get('result'):
                 forecast_response = result.get('result', {})
-                self.logger.info(f"Extracted from 'result' wrapper")
+                self.logger.debug(f"Extracted from 'result' wrapper")
             
             # Log forecast data if available
             if isinstance(forecast_response, dict):
                 for entity_id, entity_data in forecast_response.items():
-                    self.logger.info(f"Entity: {entity_id}")
+                    self.logger.debug(f"Entity: {entity_id}")
                     
                     if isinstance(entity_data, dict):
                         # Check if forecast is under 'forecast' key
                         forecasts = entity_data.get('forecast', [])
                         if forecasts:
-                            self.logger.info(f"  Found {len(forecasts)} forecast items in 'forecast' key")
+                            self.logger.debug(f"  Found {len(forecasts)} forecast items in 'forecast' key")
                         else:
-                            self.logger.info(f"  Entity data keys: {list(entity_data.keys())}")
+                            self.logger.debug(f"  Entity data keys: {list(entity_data.keys())}")
                     elif isinstance(entity_data, list):
                         forecasts = entity_data
-                        self.logger.info(f"  Found {len(forecasts)} forecast items (direct array)")
+                        self.logger.debug(f"  Found {len(forecasts)} forecast items (direct array)")
                     else:
-                        self.logger.info(f"  Unknown data type: {type(entity_data).__name__}")
+                        self.logger.debug(f"  Unknown data type: {type(entity_data).__name__}")
                         continue
                     
                     # Log first 3 forecasts with all details
@@ -257,9 +257,9 @@ class HomeAssistantClient:
                                 templow = f.get('templow', 'N/A')
                                 wind = f.get('wind_speed', 'N/A')
                                 humidity = f.get('humidity', 'N/A')
-                                self.logger.info(f"    [{i}] {date_key}")
-                                self.logger.info(f"        Condition: {condition}, Temp: {temp}°/{templow}°")
-                                self.logger.info(f"        Wind: {wind}, Humidity: {humidity}%")
+                                self.logger.debug(f"    [{i}] {date_key}")
+                                self.logger.debug(f"        Condition: {condition}, Temp: {temp}°/{templow}°")
+                                self.logger.debug(f"        Wind: {wind}, Humidity: {humidity}%")
             
             return forecast_response if forecast_response else None
                 
@@ -268,7 +268,7 @@ class HomeAssistantClient:
             self.logger.warning(f"Weather forecast service HTTP error {e.response.status_code}")
             try:
                 error_detail = e.response.text
-                self.logger.info(f"  Error response: {error_detail}")
+                self.logger.debug(f"  Error response: {error_detail}")
             except:
                 pass
             return None
