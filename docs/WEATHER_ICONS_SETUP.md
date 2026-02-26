@@ -6,6 +6,16 @@ This guide explains how to install the Weather Icons font to display beautiful w
 
 Weather Icons is a free, open-source icon font designed specifically for weather conditions. It includes dozens of weather-related icons that render perfectly on e-paper displays.
 
+In the **Agenda view**, weather icons are displayed in **color** to make them more visually appealing:
+- **Gold with black outline**: Sunny, partly cloudy, lightning (outlined for maximum visibility)
+- **Blue**: Rain, snow, night, hail
+- **Red**: Exceptional/severe weather warnings
+- **Black**: Cloudy, windy, fog
+
+The gold icons are rendered with a bold black outline to ensure they stand out clearly on the display.
+
+Other calendar views display weather icons in the standard color (white or black) to maintain readability in their blue headers.
+
 - **Project**: https://erikflowers.github.io/weather-icons/
 - **License**: SIL Open Font License
 - **Font File**: `weathericons-regular-webfont.ttf`
@@ -45,17 +55,22 @@ fc-list | grep -i weather
 
 The system automatically maps Home Assistant weather conditions to Weather Icons:
 
-| HA Condition | Icon | Unicode |
-|-----------|------|---------|
-| sunny | ☀ | \uf00d |
-| clear-night | 🌙 | \uf02e |
-| cloudy | ☁ | \uf013 |
-| fog | 🌫 | \uf014 |
-| rainy | 🌧 | \uf019 |
-| pouring | ⛈ | \uf018 |
-| snowy | ❄ | \uf01b |
-| lightning | ⚡ | \uf016 |
-| partlycloudy | ⛅ | \uf002 |
+| HA Condition | Icon | Unicode | Agenda Color |
+|-----------|------|---------|--------------|
+| sunny | ☀ | \uf00d | Gold |
+| clear-night | 🌙 | \uf02e | Blue |
+| cloudy | ☁ | \uf013 | Black |
+| fog | 🌫 | \uf014 | Black |
+| rainy | 🌧 | \uf019 | Blue |
+| pouring | ⛈ | \uf018 | Blue |
+| snowy | ❄ | \uf01b | Blue |
+| lightning | ⚡ | \uf016 | Gold |
+| partlycloudy | ⛅ | \uf002 | Gold |
+| hail | - | \uf015 | Blue |
+| windy | - | \uf021 | Black |
+| exceptional | - | \uf03b | Red |
+
+**Note**: In the Agenda view, weather icons display in the colors shown above. Gold icons are rendered with a bold black outline for maximum visibility on the e-paper display. In other calendar views (week, month, etc.), icons display in standard colors to maintain readability against blue headers.
 
 ## Troubleshooting
 

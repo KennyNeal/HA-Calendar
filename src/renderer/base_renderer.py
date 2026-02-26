@@ -222,6 +222,49 @@ class BaseRenderer:
 
         return text_width, text_height
 
+    def draw_text_with_outline(self, draw, text, x, y, font, color, outline_color=None, align='left'):
+        """
+        Draw text with a bold outline for better visibility.
+
+        Args:
+            draw: ImageDraw object
+            text: Text to draw
+            x: X coordinate
+            y: Y coordinate
+            font: Font object
+            color: RGB color tuple for the text
+            outline_color: RGB color tuple for the outline (defaults to black)
+            align: Text alignment ('left', 'center', 'right')
+
+        Returns:
+            tuple: (width, height) of drawn text
+        """
+        if outline_color is None:
+            outline_color = self.black
+
+        # Calculate text bbox for alignment
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+        # Adjust x position based on alignment
+        if align == 'center':
+            x = x - text_width // 2
+        elif align == 'right':
+            x = x - text_width
+
+        # Draw outline by drawing text at multiple offset positions
+        outline_width = 2  # Thickness of outline
+        for offset_x in range(-outline_width, outline_width + 1):
+            for offset_y in range(-outline_width, outline_width + 1):
+                if offset_x != 0 or offset_y != 0:
+                    draw.text((x + offset_x, y + offset_y), text, font=font, fill=outline_color)
+
+        # Draw the main text on top
+        draw.text((x, y), text, font=font, fill=color)
+
+        return text_width, text_height
+
     def truncate_text(self, text, max_width, font, draw):
         """
         Truncate text to fit within max_width with ellipsis.

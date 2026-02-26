@@ -230,7 +230,7 @@ class AgendaRenderer(BaseRenderer):
             from weather_data import WeatherDataProcessor
             weather_processor = WeatherDataProcessor()
 
-            icon = weather_processor.get_weather_icon(weather_info.condition.lower())
+            icon, icon_color = weather_processor.get_weather_icon_with_color(weather_info.condition.lower())
             temp_str = f"{weather_info.temperature:.0f}{weather_info.temperature_unit}"
 
             icon_font = self.fonts.get('weather_large', self.fonts['xlarge'])
@@ -246,7 +246,12 @@ class AgendaRenderer(BaseRenderer):
             start_x = weather_x_center - (total_width // 2)
 
             if icon:
-                self.draw_text(draw, icon, start_x, weather_y, icon_font, self.black)
+                icon_rgb = self.color_manager.get_rgb(icon_color)
+                # Use outlined text for gold icons to make them more visible
+                if icon_color == 'gold':
+                    self.draw_text_with_outline(draw, icon, start_x, weather_y, icon_font, icon_rgb)
+                else:
+                    self.draw_text(draw, icon, start_x, weather_y, icon_font, icon_rgb)
             self.draw_text(draw, temp_str, start_x + icon_width + gap, weather_y + 6, temp_font, self.black)
 
             weather_y += 80
@@ -299,7 +304,7 @@ class AgendaRenderer(BaseRenderer):
                 if not forecast:
                     continue
 
-                icon = weather_processor.get_weather_icon(forecast.condition.lower())
+                icon, icon_color = weather_processor.get_weather_icon_with_color(forecast.condition.lower())
                 high_str = f"{int(forecast.temperature)}°"
                 low_str = f"{int(forecast.temperature_low)}°" if forecast.temperature_low is not None else ""
                 temp_str = f"{high_str}/{low_str}" if low_str else high_str
@@ -318,7 +323,12 @@ class AgendaRenderer(BaseRenderer):
 
                 self.draw_text(draw, day_label, x_pos, row_y, self.fonts['large'], self.black, align='center')
                 if icon:
-                    self.draw_text(draw, icon, x_pos, row_y + 24, weather_icon_font, self.black, align='center')
+                    icon_rgb = self.color_manager.get_rgb(icon_color)
+                    # Use outlined text for gold icons to make them more visible
+                    if icon_color == 'gold':
+                        self.draw_text_with_outline(draw, icon, x_pos, row_y + 24, weather_icon_font, icon_rgb, align='center')
+                    else:
+                        self.draw_text(draw, icon, x_pos, row_y + 24, weather_icon_font, icon_rgb, align='center')
                 self.draw_text(draw, temp_str, x_pos, row_y + 60, self.fonts['medium'], self.black, align='center')
 
         # Draw footer with last updated time and calendar legend
@@ -335,17 +345,17 @@ class AgendaRenderer(BaseRenderer):
 
         direction = bearing % 360
         if 22.5 <= direction < 67.5:
-            return "^>"
+            return "NE"  # Northeast
         if 67.5 <= direction < 112.5:
-            return ">"
+            return "E"   # East
         if 112.5 <= direction < 157.5:
-            return "v>"
+            return "SE"  # Southeast
         if 157.5 <= direction < 202.5:
-            return "v"
+            return "S"   # South
         if 202.5 <= direction < 247.5:
-            return "<v"
+            return "SW"  # Southwest
         if 247.5 <= direction < 292.5:
-            return "<"
+            return "W"   # West
         if 292.5 <= direction < 337.5:
-            return "^<"
-        return "^"
+            return "NW"  # Northwest
+        return "N"   # North

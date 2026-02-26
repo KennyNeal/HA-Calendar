@@ -287,6 +287,41 @@ class WeatherDataProcessor:
         condition_key = condition.lower() if condition else None
         return self.WEATHER_ICONS.get(condition_key, '\uf03b')  # Default to exceptional
 
+    def get_weather_icon_with_color(self, condition):
+        """
+        Get Weather Icons font character with appropriate color for e-paper display.
+
+        Args:
+            condition: Weather condition string (e.g., 'sunny', 'rainy')
+
+        Returns:
+            tuple: (icon, color_name) - Weather icon character and e-paper color
+        """
+        # Map weather conditions to colors for e-paper display
+        WEATHER_COLORS = {
+            'sunny': 'gold',             # Bright sun - gold is more visible than yellow
+            'clear-night': 'blue',       # Night
+            'partlycloudy': 'gold',      # Sun behind cloud
+            'cloudy': 'black',           # Gray cloud
+            'rainy': 'blue',             # Rain
+            'pouring': 'blue',           # Heavy rain
+            'snowy': 'blue',             # Snow
+            'snowy-rainy': 'blue',       # Mixed precipitation
+            'lightning': 'gold',         # Lightning - bright gold
+            'lightning-rainy': 'gold',   # Thunder with rain
+            'hail': 'blue',              # Hail
+            'windy': 'black',            # Wind
+            'windy-variant': 'black',    # Wind variant
+            'fog': 'black',              # Fog
+            'exceptional': 'red',        # Warning/alert
+        }
+        
+        condition_key = condition.lower() if condition else None
+        icon = self.WEATHER_ICONS.get(condition_key, '\uf03b')
+        color = WEATHER_COLORS.get(condition_key, 'black')
+        
+        return icon, color
+
     def format_weather_with_icon(self, weather_info):
         """
         Format weather with icon and temperature.
