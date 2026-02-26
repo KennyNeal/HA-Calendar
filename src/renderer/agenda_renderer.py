@@ -64,6 +64,9 @@ class AgendaRenderer(BaseRenderer):
         # Get sorted dates
         sorted_dates = sorted(events_by_day.keys())
 
+        # Collect unique calendars for legend {name: color}
+        calendar_legend = {}
+
         # Draw events chronologically
         line_height = 24
         padding = 20
@@ -124,11 +127,15 @@ class AgendaRenderer(BaseRenderer):
                 # Format event text
                 text_x = indicator_x + indicator_size + 10
 
+                # Track calendar for legend
+                if event.calendar_name and event.calendar_name not in calendar_legend:
+                    calendar_legend[event.calendar_name] = event.color
+
                 if event.all_day:
-                    event_text = f"{event.title} (All Day) - {event.calendar_name}"
+                    event_text = f"{event.title} (All Day)"
                 else:
                     time_str = event.start.strftime("%I:%M %p")
-                    event_text = f"{time_str} - {event.title} ({event.calendar_name})"
+                    event_text = f"{time_str} - {event.title}"
 
                 # Draw wrapped event text
                 text_lines = self.wrap_text(
@@ -269,10 +276,10 @@ class AgendaRenderer(BaseRenderer):
                     self.draw_text(draw, icon, x_pos, row_y + 24, weather_icon_font, self.black, align='center')
                 self.draw_text(draw, temp_str, x_pos, row_y + 60, self.fonts['medium'], self.black, align='center')
 
-        # Draw footer with last updated time
-        self.draw_footer(draw, self.height - footer_height, footer_height, footer_sensor_text)
-
-        # Legend removed - calendar colors are self-explanatory
+        # Draw footer with last updated time and calendar legend
+        footer_y = self.height - footer_height
+        self.draw_footer(draw, footer_y, footer_height, footer_sensor_text)
+        self.draw_calendar_legend(draw, footer_y, footer_height, calendar_legend)
 
         self.logger.info("Rendered agenda list view")
         return image

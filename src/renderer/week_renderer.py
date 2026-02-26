@@ -49,10 +49,11 @@ class WeekRenderer(BaseRenderer):
         # Draw week row
         self._draw_week_row(draw, week_start, y, row_height, col_width, events_by_day, weather_info)
 
-        # Draw footer with last updated time
-        self.draw_footer(draw, y + row_height, footer_height, footer_sensor_text)
-
-        # Legend removed - calendar colors are self-explanatory
+        # Draw footer with last updated time and calendar legend
+        footer_y = y + row_height
+        self.draw_footer(draw, footer_y, footer_height, footer_sensor_text)
+        calendar_legend = self._collect_calendar_legend(events_by_day)
+        self.draw_calendar_legend(draw, footer_y, footer_height, calendar_legend)
 
         self.logger.info("Rendered week calendar view")
         return image
