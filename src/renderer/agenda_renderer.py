@@ -78,6 +78,51 @@ class AgendaRenderer(BaseRenderer):
             if not day_events.events:
                 continue  # Skip days with no events
 
+            # Filter past events for today
+            events_to_show = []
+            for event in day_events.events:
+                # If today, skip events that have already passed
+                if day_events.is_today and not event.all_day:
+                    # Handle both timezone-aware and timezone-naive datetimes
+                    current_time = datetime.now(event.start.tzinfo) if event.start.tzinfo else datetime.now()
+                    if event.start < current_time:
+                        continue
+                events_to_show.append(event)
+
+            if not events_to_show:
+                continue  # Skip if no events to show
+
+            # Check if this is today or tomorrow
+            is_tomorrow = event_date == date.today() + timedelta(days=1)
+            
+            # For days other than today/tomorrow, check if we can show all events
+            if not day_events.is_today and not is_tomorrow:
+                # Calculate space needed for this day
+                text_x = padding + 10 + 10 + 10  # padding + indicator position + indicator size + gap
+                space_needed = line_height + 5  # date header with underline
+                
+                for event in events_to_show:
+                    if event.all_day:
+                        event_text = f"{event.title} (All Day)"
+                    else:
+                        time_str = event.start.strftime("%I:%M %p")
+                        event_text = f"{time_str} - {event.title}"
+                    
+                    text_lines = self.wrap_text(
+                        event_text,
+                        max_width - (text_x - padding),
+                        self.fonts['normal'],
+                        draw,
+                        max_lines=2
+                    )
+                    space_needed += line_height * len(text_lines)
+                
+                space_needed += 6  # spacing between days
+                
+                # Skip this day if we can't show all events
+                if content_y + space_needed > content_bottom:
+                    continue
+
             # Draw date header
             if day_events.is_today:
                 date_str = f"TODAY - {event_date.strftime('%A, %B %d')}"
@@ -107,7 +152,7 @@ class AgendaRenderer(BaseRenderer):
             content_y += line_height + 5
 
             # Draw events for this day
-            for event in day_events.events:
+            for event in events_to_show:
                 if content_y + line_height > content_bottom:
                     break  # No more space
 
@@ -185,7 +230,7 @@ class AgendaRenderer(BaseRenderer):
             from weather_data import WeatherDataProcessor
             weather_processor = WeatherDataProcessor()
 
-            icon = weather_processor.get_weather_icon(weather_info.condition.lower())
+            icon, icon_color = weather_processor.get_weather_icon_with_color(weather_info.condition.lower())
             temp_str = f"{weather_info.temperature:.0f}{weather_info.temperature_unit}"
 
             icon_font = self.fonts.get('weather_large', self.fonts['xlarge'])
@@ -201,7 +246,12 @@ class AgendaRenderer(BaseRenderer):
             start_x = weather_x_center - (total_width // 2)
 
             if icon:
-                self.draw_text(draw, icon, start_x, weather_y, icon_font, self.black)
+                icon_rgb = self.color_manager.get_rgb(icon_color)
+                # Use outlined text for gold icons to make them more visible
+                if icon_color == 'gold':
+                    self.draw_text_with_outline(draw, icon, start_x, weather_y, icon_font, icon_rgb)
+                else:
+                    self.draw_text(draw, icon, start_x, weather_y, icon_font, icon_rgb)
             self.draw_text(draw, temp_str, start_x + icon_width + gap, weather_y + 6, temp_font, self.black)
 
             weather_y += 80
@@ -254,7 +304,7 @@ class AgendaRenderer(BaseRenderer):
                 if not forecast:
                     continue
 
-                icon = weather_processor.get_weather_icon(forecast.condition.lower())
+                icon, icon_color = weather_processor.get_weather_icon_with_color(forecast.condition.lower())
                 high_str = f"{int(forecast.temperature)}°"
                 low_str = f"{int(forecast.temperature_low)}°" if forecast.temperature_low is not None else ""
                 temp_str = f"{high_str}/{low_str}" if low_str else high_str
@@ -273,7 +323,12 @@ class AgendaRenderer(BaseRenderer):
 
                 self.draw_text(draw, day_label, x_pos, row_y, self.fonts['large'], self.black, align='center')
                 if icon:
-                    self.draw_text(draw, icon, x_pos, row_y + 24, weather_icon_font, self.black, align='center')
+                    icon_rgb = self.color_manager.get_rgb(icon_color)
+                    # Use outlined text for gold icons to make them more visible
+                    if icon_color == 'gold':
+                        self.draw_text_with_outline(draw, icon, x_pos, row_y + 24, weather_icon_font, icon_rgb, align='center')
+                    else:
+                        self.draw_text(draw, icon, x_pos, row_y + 24, weather_icon_font, icon_rgb, align='center')
                 self.draw_text(draw, temp_str, x_pos, row_y + 60, self.fonts['medium'], self.black, align='center')
 
         # Draw footer with last updated time and calendar legend
@@ -290,17 +345,17 @@ class AgendaRenderer(BaseRenderer):
 
         direction = bearing % 360
         if 22.5 <= direction < 67.5:
-            return "^>"
+            return "NE"  # Northeast
         if 67.5 <= direction < 112.5:
-            return ">"
+            return "E"   # East
         if 112.5 <= direction < 157.5:
-            return "v>"
+            return "SE"  # Southeast
         if 157.5 <= direction < 202.5:
-            return "v"
+            return "S"   # South
         if 202.5 <= direction < 247.5:
-            return "<v"
+            return "SW"  # Southwest
         if 247.5 <= direction < 292.5:
-            return "<"
+            return "W"   # West
         if 292.5 <= direction < 337.5:
-            return "^<"
-        return "^"
+            return "NW"  # Northwest
+        return "N"   # North

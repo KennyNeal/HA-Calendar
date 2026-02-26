@@ -17,6 +17,7 @@ class ColorManager:
         'white': (255, 255, 255),
         'red': (255, 0, 0),
         'yellow': (255, 255, 0),
+        'gold': (255, 180, 0),      # Gold/orange - more visible than yellow on e-paper
         'green': (0, 255, 0),
         'blue': (0, 0, 255)
     }
