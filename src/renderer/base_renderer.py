@@ -426,6 +426,65 @@ class BaseRenderer:
 
         return footer_y + height
 
+    def _collect_calendar_legend(self, events_by_day):
+        """
+        Collect unique calendar names and their colors from all events.
+
+        Args:
+            events_by_day: Dictionary mapping date to DayEvents
+
+        Returns:
+            dict: {calendar_name: color} (insertion-ordered, up to 3)
+        """
+        legend = {}
+        for day_events in events_by_day.values():
+            if day_events and day_events.events:
+                for event in day_events.events:
+                    if event.calendar_name and event.calendar_name not in legend:
+                        legend[event.calendar_name] = event.color
+        return legend
+
+    def draw_calendar_legend(self, draw, footer_y, footer_height, calendar_legend):
+        """
+        Draw a colored-dot legend for calendars, centered in the footer.
+
+        Args:
+            draw: ImageDraw object
+            footer_y: Y coordinate where the footer starts
+            footer_height: Height of the footer in pixels
+            calendar_legend: dict {calendar_name: color} (up to 3 shown)
+        """
+        if not calendar_legend:
+            return
+        dot_size = 12
+        dot_text_gap = 5
+        item_gap = 18
+        legend_items = list(calendar_legend.items())[:3]
+
+        # Measure total legend width
+        total_legend_width = 0
+        item_widths = []
+        for cal_name, _ in legend_items:
+            bbox = draw.textbbox((0, 0), cal_name, font=self.fonts['small'])
+            text_w = bbox[2] - bbox[0]
+            item_w = dot_size + dot_text_gap + text_w
+            item_widths.append(item_w)
+            total_legend_width += item_w
+        total_legend_width += item_gap * (len(legend_items) - 1)
+
+        legend_x = (self.width - total_legend_width) // 2
+        legend_y = footer_y + (footer_height - dot_size) // 2
+
+        for i, (cal_name, cal_color) in enumerate(legend_items):
+            self.draw_box(draw, legend_x, legend_y, dot_size, dot_size, fill=cal_color)
+            self.draw_text(
+                draw, cal_name,
+                legend_x + dot_size + dot_text_gap,
+                legend_y,
+                self.fonts['small'], self.black
+            )
+            legend_x += item_widths[i] + item_gap
+
     def draw_legend(self, draw, y_start, calendars):
         """
         Draw calendar legend.
