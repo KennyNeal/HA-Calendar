@@ -111,7 +111,7 @@ class AgendaRenderer(BaseRenderer):
                     text_lines = self.wrap_text(
                         event_text,
                         max_width - (text_x - padding),
-                        self.fonts['normal'],
+                        self.fonts['medium'],
                         draw,
                         max_lines=2
                     )
@@ -136,15 +136,15 @@ class AgendaRenderer(BaseRenderer):
                 date_str,
                 padding,
                 content_y,
-                self.fonts['medium'],
+                self.fonts['large'],
                 self.black
             )
 
             # Draw underline for date
-            date_bbox = draw.textbbox((padding, content_y), date_str, font=self.fonts['medium'])
+            date_bbox = draw.textbbox((padding, content_y), date_str, font=self.fonts['large'])
             date_width = date_bbox[2] - date_bbox[0]
             draw.line(
-                [(padding, content_y + 18), (padding + date_width, content_y + 18)],
+                [(padding, content_y + 24), (padding + date_width, content_y + 24)],
                 fill=self.black,
                 width=1
             )
@@ -186,7 +186,7 @@ class AgendaRenderer(BaseRenderer):
                 text_lines = self.wrap_text(
                     event_text,
                     max_width - (text_x - padding),
-                    self.fonts['normal'],
+                    self.fonts['medium'],
                     draw,
                     max_lines=2
                 )
@@ -198,7 +198,7 @@ class AgendaRenderer(BaseRenderer):
                         "... (more events not shown)",
                         padding,
                         content_y,
-                        self.fonts['normal'],
+                        self.fonts['medium'],
                         self.black
                     )
                     content_y = content_bottom
@@ -210,7 +210,7 @@ class AgendaRenderer(BaseRenderer):
                         line,
                         text_x,
                         content_y,
-                        self.fonts['normal'],
+                        self.fonts['medium'],
                         self.black
                     )
                     content_y += line_height
