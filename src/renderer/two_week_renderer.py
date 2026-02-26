@@ -104,7 +104,7 @@ class TwoWeekRenderer(BaseRenderer):
                 is_today,
                 all_day_height,
                 span_keys,
-                weather_info if is_today else None
+                weather_info
             )
 
     def _draw_day_cell(self, draw, x, y, width, height, date_obj, day_name, day_events, is_today, all_day_height, span_keys, weather_info=None):
@@ -144,7 +144,7 @@ class TwoWeekRenderer(BaseRenderer):
         # Draw weather icon and temperature right-aligned in header
         if weather_info:
             icon, condition = self.get_weather_icon_for_date(weather_info, date_obj)
-            
+
             # Get temperature for this date from forecast dict
             temp_str = None
             if weather_info and weather_info.forecast:
@@ -152,39 +152,35 @@ class TwoWeekRenderer(BaseRenderer):
                 forecast = weather_info.forecast.get(date_key)
                 if forecast and forecast.temperature:
                     temp_str = f"{int(forecast.temperature)}°"
-            
-            # Fallback to current temperature if no forecast available
-            if not temp_str and weather_info and weather_info.temperature:
-                temp_str = f"{int(weather_info.temperature)}°"
-            
+
             if icon or temp_str:
-                weather_icon_font = self.fonts.get('weather_small', self.fonts['small'])
+                weather_icon_font = self.fonts.get('weather_tiny', self.fonts['small'])
                 temp_font = self.fonts['small']
-                
+
                 # Measure widths separately
                 icon_width = 0
                 if icon:
                     icon_bbox = draw.textbbox((0, 0), icon, font=weather_icon_font)
                     icon_width = icon_bbox[2] - icon_bbox[0]
-                
+
                 temp_width = 0
                 if temp_str:
                     temp_bbox = draw.textbbox((0, 0), temp_str, font=temp_font)
                     temp_width = temp_bbox[2] - temp_bbox[0]
-                
+
                 # Position from right edge of cell (icon + space + temp)
-                total_width = icon_width + (8 if icon and temp_str else 0) + temp_width
+                total_width = icon_width + (6 if icon and temp_str else 0) + temp_width
                 weather_x = x + width - 5 - total_width
-                weather_y = y + 6
-                
+                weather_y = y + 7
+
                 # Draw icon first
                 if icon:
                     self.draw_text(draw, icon, weather_x, weather_y, weather_icon_font, self.white)
-                    weather_x += icon_width + 8
-                
+                    weather_x += icon_width + 6
+
                 # Draw temperature
                 if temp_str:
-                    self.draw_text(draw, temp_str, weather_x, weather_y + 2, temp_font, self.white)
+                    self.draw_text(draw, temp_str, weather_x, weather_y + 1, temp_font, self.white)
 
         # Draw events if any
         if day_events and day_events.events:

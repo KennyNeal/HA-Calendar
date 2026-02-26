@@ -151,11 +151,7 @@ class WeekRenderer(BaseRenderer):
                 forecast = weather_info.forecast.get(date_key)
                 if forecast and forecast.temperature:
                     temp_str = f"{int(forecast.temperature)}°"
-            
-            # Fallback to current temperature if no forecast available
-            if not temp_str and weather_info and weather_info.temperature:
-                temp_str = f"{int(weather_info.temperature)}°"
-            
+
             if icon or temp_str:
                 weather_icon_font = self.fonts.get('weather_tiny', self.fonts['small'])
                 temp_font = self.fonts['small']
