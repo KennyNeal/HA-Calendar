@@ -213,11 +213,11 @@ class AgendaRenderer(BaseRenderer):
                     detail,
                     right_x + 12,
                     weather_y,
-                    self.fonts['medium'],
+                    self.fonts['large'],
                     self.black,
                     max_width=right_width - 24
                 )
-                weather_y += 26
+                weather_y += 30
         else:
             self.draw_text(
                 draw,
@@ -230,31 +230,44 @@ class AgendaRenderer(BaseRenderer):
             )
             weather_y += 40
 
-        # 3-day forecast (today + next 2 days)
+        # 5-day forecast (today + next 4 days): 3 on top row, 2 on bottom row
         forecast_y = weather_y + 16
         forecast_item_width = right_width // 3
+        forecast_row2_y = forecast_y + 88  # second row below first
         if weather_info and weather_info.forecast:
             today = date.today()
-            for day_offset in range(3):
+            from weather_data import WeatherDataProcessor
+            weather_processor = WeatherDataProcessor()
+            weather_icon_font = self.fonts.get('weather_medium', self.fonts['large'])
+
+            for day_offset in range(5):
                 forecast_date = today + timedelta(days=day_offset)
                 date_key = forecast_date.isoformat()
                 forecast = weather_info.forecast.get(date_key)
                 if not forecast:
                     continue
 
-                from weather_data import WeatherDataProcessor
-                weather_processor = WeatherDataProcessor()
                 icon = weather_processor.get_weather_icon(forecast.condition.lower())
-                temp_str = f"{int(forecast.temperature)}°"
-
-                x_pos = right_x + (day_offset * forecast_item_width) + (forecast_item_width // 2)
+                high_str = f"{int(forecast.temperature)}°"
+                low_str = f"{int(forecast.temperature_low)}°" if forecast.temperature_low is not None else ""
+                temp_str = f"{high_str}/{low_str}" if low_str else high_str
                 day_label = forecast_date.strftime("%a")
 
-                self.draw_text(draw, day_label, x_pos, forecast_y, self.fonts['medium'], self.black, align='center')
+                if day_offset < 3:
+                    # Top row: 3 columns
+                    x_pos = right_x + (day_offset * forecast_item_width) + (forecast_item_width // 2)
+                    row_y = forecast_y
+                else:
+                    # Bottom row: 2 days centered across right panel
+                    col = day_offset - 3  # 0 or 1
+                    half_width = right_width // 2
+                    x_pos = right_x + col * half_width + (half_width // 2)
+                    row_y = forecast_row2_y
+
+                self.draw_text(draw, day_label, x_pos, row_y, self.fonts['large'], self.black, align='center')
                 if icon:
-                    weather_icon_font = self.fonts.get('weather_small', self.fonts['medium'])
-                    self.draw_text(draw, icon, x_pos, forecast_y + 18, weather_icon_font, self.black, align='center')
-                self.draw_text(draw, temp_str, x_pos, forecast_y + 46, self.fonts['medium'], self.black, align='center')
+                    self.draw_text(draw, icon, x_pos, row_y + 24, weather_icon_font, self.black, align='center')
+                self.draw_text(draw, temp_str, x_pos, row_y + 60, self.fonts['medium'], self.black, align='center')
 
         # Draw footer with last updated time
         self.draw_footer(draw, self.height - footer_height, footer_height, footer_sensor_text)
