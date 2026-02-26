@@ -238,6 +238,7 @@ class AgendaRenderer(BaseRenderer):
 
             icon_bbox = draw.textbbox((0, 0), icon, font=icon_font) if icon else (0, 0, 0, 0)
             icon_width = icon_bbox[2] - icon_bbox[0]
+            icon_height = icon_bbox[3] - icon_bbox[1]
             temp_bbox = draw.textbbox((0, 0), temp_str, font=temp_font)
             temp_width = temp_bbox[2] - temp_bbox[0]
 
@@ -254,27 +255,53 @@ class AgendaRenderer(BaseRenderer):
                     self.draw_text(draw, icon, start_x, weather_y, icon_font, icon_rgb)
             self.draw_text(draw, temp_str, start_x + icon_width + gap, weather_y + 6, temp_font, self.black)
 
-            weather_y += 80
-
+            # Draw formatted condition 3 pixels below the icon
+            formatted_condition = self._format_condition(weather_info.condition)
+            condition_y = weather_y + icon_height + 3
+            self.draw_text(
+                draw,
+                formatted_condition,
+                weather_x_center,
+                condition_y,
+                self.fonts['large'],
+                self.black,
+                align='center',
+                max_width=right_width - 24
+            )
+            
+            # Calculate positions for forecast to end 3 pixels above footer
+            footer_y = self.height - footer_height
+            # Forecast layout: day_label at row_y, icon at row_y+24, temp at row_y+72
+            # Assuming temp text height ~20px, bottom is at row_y+92
+            forecast_row2_y = footer_y - 95  # Bottom of row 2 will be ~3px above footer
+            forecast_y = forecast_row2_y - 88  # Row 1 is 88px above row 2
+            
+            # Center humidity and wind between condition and forecast
+            # condition ends at condition_y + text_height (estimate ~24px)
+            # We have 2 detail lines, each 30px tall = 60px total
+            condition_end = condition_y + 24
+            available_space = forecast_y - condition_end
+            details_start_y = condition_end + (available_space - 60) // 2
+            
             wind_arrow = self._bearing_to_arrow(weather_info.wind_bearing)
             wind_suffix = f" {wind_arrow}" if wind_arrow else ""
             details = [
-                f"Condition: {weather_info.condition}",
                 f"Humidity: {weather_info.humidity}%",
                 f"Wind: {weather_info.wind_speed:.0f} {weather_info.wind_speed_unit}{wind_suffix}",
             ]
 
+            detail_y = details_start_y
             for detail in details:
                 self.draw_text(
                     draw,
                     detail,
                     right_x + 12,
-                    weather_y,
+                    detail_y,
                     self.fonts['large'],
                     self.black,
                     max_width=right_width - 24
                 )
-                weather_y += 30
+                detail_y += 30
         else:
             self.draw_text(
                 draw,
@@ -286,11 +313,12 @@ class AgendaRenderer(BaseRenderer):
                 align='center'
             )
             weather_y += 40
+            footer_y = self.height - footer_height
+            forecast_y = weather_y + 16
+            forecast_row2_y = forecast_y + 88
 
         # 5-day forecast (today + next 4 days): 3 on top row, 2 on bottom row
-        forecast_y = weather_y + 16
         forecast_item_width = right_width // 3
-        forecast_row2_y = forecast_y + 88  # second row below first
         if weather_info and weather_info.forecast:
             today = date.today()
             from weather_data import WeatherDataProcessor
@@ -339,6 +367,44 @@ class AgendaRenderer(BaseRenderer):
         self.logger.info("Rendered agenda list view")
         return image
 
+    def _format_condition(self, condition):
+        """Format weather condition for display.
+        
+        Args:
+            condition: Raw weather condition string
+            
+        Returns:
+            Formatted condition string with proper capitalization
+        """
+        if not condition:
+            return ""
+        
+        # Common weather condition mappings
+        condition_map = {
+            'partlycloudy': 'Partly Cloudy',
+            'mostlycloudy': 'Mostly Cloudy',
+            'mostlysunny': 'Mostly Sunny',
+            'partlysunny': 'Partly Sunny',
+            'clearnight': 'Clear Night',
+            'cloudynight': 'Cloudy Night',
+            'rainyday': 'Rainy Day',
+            'rainynight': 'Rainy Night',
+            'snowyday': 'Snowy Day',
+            'snowynight': 'Snowy Night',
+        }
+        
+        # Check if we have a direct mapping
+        condition_lower = condition.lower().replace(' ', '').replace('-', '').replace('_', '')
+        if condition_lower in condition_map:
+            return condition_map[condition_lower]
+        
+        # Otherwise, try to intelligently split and capitalize
+        # Replace common separators with spaces
+        formatted = condition.replace('_', ' ').replace('-', ' ')
+        
+        # Title case each word
+        return formatted.title()
+    
     def _bearing_to_arrow(self, bearing):
         if bearing is None:
             return ""
