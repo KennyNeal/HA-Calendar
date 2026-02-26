@@ -196,7 +196,7 @@ class MonthRenderer(BaseRenderer):
             # Draw weather icon and temperature right-aligned in header
             if weather_info:
                 icon, condition = self.get_weather_icon_for_date(weather_info, date_obj)
-                
+
                 # Get temperature for this date from forecast dict
                 temp_str = None
                 if weather_info and weather_info.forecast:
@@ -204,11 +204,7 @@ class MonthRenderer(BaseRenderer):
                     forecast = weather_info.forecast.get(date_key)
                     if forecast and forecast.temperature:
                         temp_str = f"{int(forecast.temperature)}°"
-                
-                # Fallback to current temperature if no forecast available
-                if not temp_str and weather_info and weather_info.temperature:
-                    temp_str = f"{int(weather_info.temperature)}°"
-                
+
                 if icon or temp_str:
                     weather_icon_font = self.fonts.get('weather_small', self.fonts['small'])
                     temp_font = self.fonts['small']
@@ -265,7 +261,7 @@ class MonthRenderer(BaseRenderer):
             # Draw weather icon and temperature for non-today dates
             if weather_info and in_current_month:
                 icon, condition = self.get_weather_icon_for_date(weather_info, date_obj)
-                
+
                 # Get temperature for this date from forecast dict
                 temp_str = None
                 if weather_info and weather_info.forecast:
@@ -273,11 +269,7 @@ class MonthRenderer(BaseRenderer):
                     forecast = weather_info.forecast.get(date_key)
                     if forecast and forecast.temperature:
                         temp_str = f"{int(forecast.temperature)}°"
-                
-                # Fallback to current temperature if no forecast available
-                if not temp_str and weather_info and weather_info.temperature:
-                    temp_str = f"{int(weather_info.temperature)}°"
-                
+
                 if icon or temp_str:
                     weather_icon_font = self.fonts.get('weather_small', self.fonts['small'])
                     temp_font = self.fonts['small']
