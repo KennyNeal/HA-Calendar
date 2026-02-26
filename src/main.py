@@ -139,12 +139,13 @@ def main():
         footer_sensor_config = config.get('footer_sensor')
         sensor_entity_id = None
         sensor_label = 'Sensor'
+        override_entity_id = 'input_select.outdoor_scene_override'
 
         if footer_sensor_config:
             sensor_entity_id = footer_sensor_config.get('entity_id')
             sensor_label = footer_sensor_config.get('label', 'Sensor')
 
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {
                 'view': executor.submit(ha_client.get_current_view),
                 'weather': executor.submit(ha_client.get_weather)
@@ -152,11 +153,15 @@ def main():
 
             if sensor_entity_id:
                 futures['footer'] = executor.submit(ha_client.get_state, sensor_entity_id)
+                if sensor_entity_id == 'sensor.outdoor_scene':
+                    futures['override'] = executor.submit(ha_client.get_state, override_entity_id)
 
             logger.info("Fetching current view selection...")
             logger.info("Fetching weather data...")
             if sensor_entity_id:
                 logger.info(f"Fetching footer sensor: {sensor_entity_id}")
+                if sensor_entity_id == 'sensor.outdoor_scene':
+                    logger.info(f"Fetching outdoor scene override: {override_entity_id}")
 
             current_view = futures['view'].result()
             logger.info(f"Current view: {current_view}")
@@ -175,14 +180,32 @@ def main():
             
             weather_info = weather_processor.parse_weather(weather_data, forecast_data)
 
+            sensor_value = None
             if 'footer' in futures:
                 try:
                     sensor_data = futures['footer'].result()
                     sensor_value = sensor_data.get('state', 'Unknown')
-                    footer_sensor_text = f"{sensor_label}: {sensor_value}"
-                    logger.debug(f"Footer sensor value: {footer_sensor_text}")
                 except Exception as e:
                     logger.warning(f"Failed to fetch footer sensor {sensor_entity_id}: {e}")
+
+            override_active = False
+            if 'override' in futures:
+                try:
+                    override_data = futures['override'].result()
+                    override_state = str(override_data.get('state', '')).strip().lower()
+                    override_active = override_state not in {
+                        '', 'auto', 'none', 'off', 'unknown', 'unavailable'
+                    }
+                    logger.debug(f"Outdoor scene override state: {override_state} (active={override_active})")
+                except Exception as e:
+                    logger.warning(f"Failed to fetch outdoor scene override {override_entity_id}: {e}")
+
+            if sensor_value is not None:
+                display_label = sensor_label
+                if sensor_entity_id == 'sensor.outdoor_scene' and override_active:
+                    display_label = 'Outdoor Scene (Overridden)'
+                footer_sensor_text = f"{display_label}: {sensor_value}"
+                logger.debug(f"Footer sensor value: {footer_sensor_text}")
 
         # Determine date range based on view
         today = datetime.now().date()
