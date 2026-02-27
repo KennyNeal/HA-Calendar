@@ -323,19 +323,19 @@ class AgendaRenderer(BaseRenderer):
                         x_pos += humidity_icon_width + gap_between
                         self.draw_text(draw, humidity_text, x_pos, high_low_y, temp_font, humidity_icon_rgb)
             
-            # Calculate positions for forecast to end 3 pixels above footer
+            # Calculate positions for forecast - bottoms of temps 3 pixels above footer
             footer_y = self.height - footer_height
             # Forecast layout: day_label at row_y, icon at row_y+24, temp at row_y+72
             # Assuming temp text height ~20px, bottom is at row_y+92
-            forecast_row2_y = footer_y - 95  # Bottom of row 2 will be ~3px above footer
-            forecast_y = forecast_row2_y - 88  # Row 1 is 88px above row 2
+            # We want: row_y + 92 = footer_y - 3, so row_y = footer_y - 95
+            forecast_y = footer_y - 95
             
             # Center humidity and wind between condition/high-low and forecast
             # condition/high-low ends at high_low_y + text_height (estimate ~24px)
-            # We have 2 detail lines, each 30px tall = 60px total
+            # We have 1 detail line, 30px tall
             condition_end = high_low_y + 30
             available_space = forecast_y - condition_end
-            details_start_y = condition_end + (available_space - 60) // 2
+            details_start_y = condition_end + (available_space - 30) // 2
             
             wind_arrow = self._bearing_to_arrow(weather_info.wind_bearing)
             wind_suffix = f" {wind_arrow}" if wind_arrow else ""
@@ -366,15 +366,15 @@ class AgendaRenderer(BaseRenderer):
             forecast_y = weather_y + 16
             forecast_row2_y = forecast_y + 88
 
-        # 5-day forecast (today + next 4 days): 3 on top row, 2 on bottom row
-        forecast_item_width = right_width // 3
+        # 4-day forecast (tomorrow + next 3 days) in a single row
+        forecast_item_width = right_width // 4
         if weather_info and weather_info.forecast:
             today = date.today()
             from weather_data import WeatherDataProcessor
             weather_processor = WeatherDataProcessor()
             weather_icon_font = self.fonts.get('weather_medium', self.fonts['large'])
 
-            for day_offset in range(5):
+            for day_offset in range(1, 5):  # Skip today (day 0), show days 1-4
                 forecast_date = today + timedelta(days=day_offset)
                 date_key = forecast_date.isoformat()
                 forecast = weather_info.forecast.get(date_key)
@@ -387,16 +387,10 @@ class AgendaRenderer(BaseRenderer):
                 temp_str = f"{high_str}/{low_str}" if low_str else high_str
                 day_label = forecast_date.strftime("%a")
 
-                if day_offset < 3:
-                    # Top row: 3 columns
-                    x_pos = right_x + (day_offset * forecast_item_width) + (forecast_item_width // 2)
-                    row_y = forecast_y
-                else:
-                    # Bottom row: 2 days centered across right panel
-                    col = day_offset - 3  # 0 or 1
-                    half_width = right_width // 2
-                    x_pos = right_x + col * half_width + (half_width // 2)
-                    row_y = forecast_row2_y
+                # Single row: 4 columns
+                col = day_offset - 1  # 0, 1, 2, 3
+                x_pos = right_x + (col * forecast_item_width) + (forecast_item_width // 2)
+                row_y = forecast_y
 
                 self.draw_text(draw, day_label, x_pos, row_y, self.fonts['large'], self.black, align='center')
                 if icon:
