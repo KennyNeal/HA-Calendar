@@ -41,7 +41,7 @@ class AgendaRenderer(BaseRenderer):
         content_bottom = self.height - footer_height
 
         # Split main content area (left: agenda, right: weather)
-        left_width = int(self.width * 0.7)
+        left_width = int(self.width * 0.65)
         right_x = left_width
         right_width = self.width - right_x
         content_y = content_top
@@ -255,9 +255,9 @@ class AgendaRenderer(BaseRenderer):
                     self.draw_text(draw, icon, start_x, weather_y, icon_font, icon_rgb)
             self.draw_text(draw, temp_str, start_x + icon_width + gap, weather_y + 6, temp_font, self.black)
 
-            # Draw formatted condition 3 pixels below the icon
+            # Draw formatted condition 5 pixels below the icon
             formatted_condition = self._format_condition(weather_info.condition)
-            condition_y = weather_y + icon_height + 3
+            condition_y = weather_y + icon_height + 5
             self.draw_text(
                 draw,
                 formatted_condition,
@@ -269,39 +269,84 @@ class AgendaRenderer(BaseRenderer):
                 max_width=right_width - 24
             )
             
-            # Calculate positions for forecast to end 3 pixels above footer
+            # Initialize wind flag
+            wind_on_same_line = False
+            
+            # Draw today's high and low temperatures with weather icons on the left
+            today = date.today()
+            high_low_y = condition_y + 32  # Below condition text
+            if weather_info.forecast:
+                date_key = today.isoformat()
+                today_forecast = weather_info.forecast.get(date_key)
+                if today_forecast:
+                    high_str = f"{int(today_forecast.temperature)}°"
+                    low_str = f"{int(today_forecast.temperature_low)}°" if today_forecast.temperature_low is not None else ""
+                    
+                    if high_str and low_str:
+                        # Set up icons and fonts (smaller to fit on one line)
+                        thermo_icon = '\uf055'  # Thermometer icon
+                        humidity_icon = '\uf07a'  # Humidity icon
+                        wind_icon = '\uf050'  # Wind icon
+                        
+                        weather_icon_font = self.fonts.get('weather_small', self.fonts['medium'])
+                        wind_icon_font_small = self.fonts.get('weather_small', self.fonts['medium'])
+                        temp_font = self.fonts['medium']
+                        gap_between = 6
+                        
+                        # Format temperatures as "high/low"
+                        temp_text = f"{high_str}/{low_str}"
+                        humidity_text = f"{weather_info.humidity}%"
+                        
+                        # Wind info
+                        wind_arrow = self._bearing_to_arrow(weather_info.wind_bearing)
+                        wind_suffix = f" {wind_arrow}" if wind_arrow else ""
+                        wind_speed_text = f"{weather_info.wind_speed:.0f} {weather_info.wind_speed_unit}{wind_suffix}"
+                        
+                        # Measure all components
+                        wind_icon_bbox = draw.textbbox((0, 0), wind_icon, font=wind_icon_font_small)
+                        wind_icon_width = wind_icon_bbox[2] - wind_icon_bbox[0]
+                        wind_speed_bbox = draw.textbbox((0, 0), wind_speed_text, font=temp_font)
+                        wind_speed_width = wind_speed_bbox[2] - wind_speed_bbox[0]
+                        
+                        thermo_bbox = draw.textbbox((0, 0), thermo_icon, font=weather_icon_font)
+                        thermo_width = thermo_bbox[2] - thermo_bbox[0]
+                        temp_bbox = draw.textbbox((0, 0), temp_text, font=temp_font)
+                        temp_width = temp_bbox[2] - temp_bbox[0]
+                        humidity_icon_bbox = draw.textbbox((0, 0), humidity_icon, font=weather_icon_font)
+                        humidity_icon_width = humidity_icon_bbox[2] - humidity_icon_bbox[0]
+                        
+                        # Layout: wind (left) + gap + thermo+temp+humidity (right)
+                        # Draw wind on left
+                        wind_x = right_x + 12
+                        self.draw_text(draw, wind_icon, wind_x, high_low_y, wind_icon_font_small, self.black)
+                        self.draw_text(draw, wind_speed_text, wind_x + wind_icon_width + gap_between, high_low_y, temp_font, self.black)
+                        
+                        # Draw temp/humidity on right side
+                        thermo_humidity_width = thermo_width + gap_between + temp_width + gap_between + humidity_icon_width + gap_between + len(humidity_text) * 8
+                        thermo_x = right_x + right_width - thermo_humidity_width - 12
+                        
+                        # Draw thermometer icon
+                        x_pos = thermo_x
+                        self.draw_text(draw, thermo_icon, x_pos, high_low_y, weather_icon_font, self.black)
+                        
+                        # Draw high/low temps
+                        x_pos += thermo_width + gap_between
+                        self.draw_text(draw, temp_text, x_pos, high_low_y, temp_font, self.black)
+                        
+                        # Draw humidity icon in blue
+                        x_pos += temp_width + gap_between
+                        humidity_icon_rgb = self.color_manager.get_rgb('blue')
+                        self.draw_text(draw, humidity_icon, x_pos, high_low_y, weather_icon_font, humidity_icon_rgb)
+                        
+                        # Draw humidity percentage in black
+                        x_pos += humidity_icon_width + gap_between
+                        self.draw_text(draw, humidity_text, x_pos, high_low_y, temp_font, self.black)
+                        
+                        wind_on_same_line = True
+            
+            # Calculate positions for forecast - bottoms of temps 3 pixels above footer
             footer_y = self.height - footer_height
-            # Forecast layout: day_label at row_y, icon at row_y+24, temp at row_y+72
-            # Assuming temp text height ~20px, bottom is at row_y+92
-            forecast_row2_y = footer_y - 95  # Bottom of row 2 will be ~3px above footer
-            forecast_y = forecast_row2_y - 88  # Row 1 is 88px above row 2
-            
-            # Center humidity and wind between condition and forecast
-            # condition ends at condition_y + text_height (estimate ~24px)
-            # We have 2 detail lines, each 30px tall = 60px total
-            condition_end = condition_y + 24
-            available_space = forecast_y - condition_end
-            details_start_y = condition_end + (available_space - 60) // 2
-            
-            wind_arrow = self._bearing_to_arrow(weather_info.wind_bearing)
-            wind_suffix = f" {wind_arrow}" if wind_arrow else ""
-            details = [
-                f"Humidity: {weather_info.humidity}%",
-                f"Wind: {weather_info.wind_speed:.0f} {weather_info.wind_speed_unit}{wind_suffix}",
-            ]
-
-            detail_y = details_start_y
-            for detail in details:
-                self.draw_text(
-                    draw,
-                    detail,
-                    right_x + 12,
-                    detail_y,
-                    self.fonts['large'],
-                    self.black,
-                    max_width=right_width - 24
-                )
-                detail_y += 30
+            forecast_y = footer_y - 95
         else:
             self.draw_text(
                 draw,
@@ -317,15 +362,15 @@ class AgendaRenderer(BaseRenderer):
             forecast_y = weather_y + 16
             forecast_row2_y = forecast_y + 88
 
-        # 5-day forecast (today + next 4 days): 3 on top row, 2 on bottom row
-        forecast_item_width = right_width // 3
+        # 4-day forecast (tomorrow + next 3 days) in a single row
+        forecast_item_width = right_width // 4
         if weather_info and weather_info.forecast:
             today = date.today()
             from weather_data import WeatherDataProcessor
             weather_processor = WeatherDataProcessor()
             weather_icon_font = self.fonts.get('weather_medium', self.fonts['large'])
 
-            for day_offset in range(5):
+            for day_offset in range(1, 5):  # Skip today (day 0), show days 1-4
                 forecast_date = today + timedelta(days=day_offset)
                 date_key = forecast_date.isoformat()
                 forecast = weather_info.forecast.get(date_key)
@@ -338,16 +383,10 @@ class AgendaRenderer(BaseRenderer):
                 temp_str = f"{high_str}/{low_str}" if low_str else high_str
                 day_label = forecast_date.strftime("%a")
 
-                if day_offset < 3:
-                    # Top row: 3 columns
-                    x_pos = right_x + (day_offset * forecast_item_width) + (forecast_item_width // 2)
-                    row_y = forecast_y
-                else:
-                    # Bottom row: 2 days centered across right panel
-                    col = day_offset - 3  # 0 or 1
-                    half_width = right_width // 2
-                    x_pos = right_x + col * half_width + (half_width // 2)
-                    row_y = forecast_row2_y
+                # Single row: 4 columns
+                col = day_offset - 1  # 0, 1, 2, 3
+                x_pos = right_x + (col * forecast_item_width) + (forecast_item_width // 2)
+                row_y = forecast_y
 
                 self.draw_text(draw, day_label, x_pos, row_y, self.fonts['large'], self.black, align='center')
                 if icon:
