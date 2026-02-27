@@ -64,6 +64,11 @@ class AgendaRenderer(BaseRenderer):
         # Get sorted dates
         sorted_dates = sorted(events_by_day.keys())
 
+        # Check if today is in the events - if not, add it to show "No events scheduled"
+        today = date.today()
+        if today not in sorted_dates:
+            sorted_dates.insert(0, today)
+
         # Collect unique calendars for legend {name: color}
         calendar_legend = {}
 
@@ -73,24 +78,38 @@ class AgendaRenderer(BaseRenderer):
         max_width = left_width - (2 * padding)
 
         for event_date in sorted_dates:
-            day_events = events_by_day[event_date]
+            # Get day events if exists, otherwise create empty one for today
+            if event_date in events_by_day:
+                day_events = events_by_day[event_date]
+            else:
+                # Create a simple object for today with no events
+                from types import SimpleNamespace
+                day_events = SimpleNamespace(
+                    date=event_date,
+                    events=[],
+                    is_today=(event_date == date.today())
+                )
 
             if not day_events.events:
-                continue  # Skip days with no events
+                # For today, we still want to show the header with "No events"
+                if not day_events.is_today:
+                    continue  # Skip days with no events (except today)
+                events_to_show = []
+            else:
+                # Filter past events for today
+                events_to_show = []
+                for event in day_events.events:
+                    # If today, skip events that have already passed
+                    if day_events.is_today and not event.all_day:
+                        # Handle both timezone-aware and timezone-naive datetimes
+                        current_time = datetime.now(event.start.tzinfo) if event.start.tzinfo else datetime.now()
+                        if event.start < current_time:
+                            continue
+                    events_to_show.append(event)
 
-            # Filter past events for today
-            events_to_show = []
-            for event in day_events.events:
-                # If today, skip events that have already passed
-                if day_events.is_today and not event.all_day:
-                    # Handle both timezone-aware and timezone-naive datetimes
-                    current_time = datetime.now(event.start.tzinfo) if event.start.tzinfo else datetime.now()
-                    if event.start < current_time:
-                        continue
-                events_to_show.append(event)
-
-            if not events_to_show:
-                continue  # Skip if no events to show
+            # For today, always show the date header even if no events
+            if not events_to_show and not day_events.is_today:
+                continue  # Skip if no events to show (except for today)
 
             # Check if this is today or tomorrow
             is_tomorrow = event_date == date.today() + timedelta(days=1)
@@ -152,6 +171,18 @@ class AgendaRenderer(BaseRenderer):
             content_y += line_height + 5
 
             # Draw events for this day
+            if not events_to_show:
+                # Show "No events scheduled" for today
+                self.draw_text(
+                    draw,
+                    "No events scheduled",
+                    padding + 10,
+                    content_y,
+                    self.fonts['medium'],
+                    self.black
+                )
+                content_y += line_height
+            
             for event in events_to_show:
                 if content_y + line_height > content_bottom:
                     break  # No more space
