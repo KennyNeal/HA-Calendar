@@ -5,7 +5,7 @@ A Python-based calendar display system for Waveshare e-Paper displays, powered b
 ## Features
 
 - **Multiple View Modes**: Two-week grid, month, single week, and agenda views
-- **Color-Coded Calendars**: Differentiate calendars with distinct colors (red, yellow, green, blue)
+- **Color-Coded Calendars**: Differentiate calendars with distinct colors - supports 50+ color names!
 - **Weather Integration**: Display current weather conditions in the header
 - **Dynamic View Switching**: Change views via Home Assistant input_select entity
 - **Low Power**: E-ink displays retain image without power
@@ -226,16 +226,31 @@ For detailed Git instructions, see **[docs/GIT_SETUP.md](docs/GIT_SETUP.md)**.
 
 ## Color Assignments
 
-The Waveshare 7.3" HAT (E) supports 6 colors:
+The Waveshare 7.3" HAT (E) supports 6 hardware colors:
 
 - **Black**: Text, borders, grid lines
 - **White**: Background
-- **Red**: First calendar (configurable)
-- **Yellow**: Second calendar (configurable)
-- **Green**: Third calendar (configurable)
-- **Blue**: Fourth calendar (configurable)
+- **Red**: Calendar events
+- **Yellow**: Calendar events
+- **Green**: Calendar events
+- **Blue**: Calendar events
 
-You can assign these colors in `config/config.yaml` under each calendar's `color` field.
+### Extended Color Palette
+
+**NEW!** You can now specify **any common color name** in your configuration (e.g., `purple`, `orange`, `teal`, `pink`), and the system will automatically map it to the nearest available e-paper color. This is especially useful for legend displays!
+
+For example:
+```yaml
+calendars:
+  - entity_id: "calendar.family"
+    color: "purple"    # → renders as red
+  - entity_id: "calendar.work"
+    color: "orange"    # → renders as yellow
+  - entity_id: "calendar.gym"
+    color: "teal"      # → renders as green
+```
+
+Over 50 color names are supported. See [docs/EXTENDED_COLORS.md](docs/EXTENDED_COLORS.md) for the full list and mapping details.
 
 ## Configuration Options
 
@@ -319,16 +334,16 @@ Edit `config/config.yaml` and add calendar entities:
 calendars:
   - entity_id: "calendar.family"
     display_name: "Family"
-    color: "red"
+    color: "purple"     # or red, orange, pink, etc.
   - entity_id: "calendar.work"
     display_name: "Work"
-    color: "green"
+    color: "teal"       # or green, cyan, lime, etc.
   - entity_id: "calendar.holidays"
     display_name: "Holidays"
-    color: "blue"
+    color: "navy"       # or blue, indigo, etc.
 ```
 
-You can add up to 4 calendars with unique colors (red, yellow, green, blue). Additional calendars will cycle through colors.
+You can use any common color name - see [docs/EXTENDED_COLORS.md](docs/EXTENDED_COLORS.md) for the full list. The display supports 4 distinct chromatic colors (red, yellow, green, blue), and additional calendars will cycle through them.
 
 ## Development
 
