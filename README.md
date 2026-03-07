@@ -241,7 +241,7 @@ The Waveshare 7.3" HAT (E) supports 6 hardware colors:
 
 **How it works:** Intermediate colors are created by arranging pixels of the base colors in patterns that your eye blends together - purple appears as a mix of red+blue pixels, orange as red+yellow, etc. This is the same technique used in color printing!
 
-**Sharp text:** The system uses **selective dithering** to preserve crisp black and white text while still dithering colored areas. This prevents text from looking fuzzy while calendar events display in their true colors.
+**Selective dithering:** The system preserves all 6 native e-paper colors (black, white, red, yellow, green, blue) perfectly sharp while only dithering intermediate colors (purple, orange, teal, etc.). This means text and borders in any native color stay crisp while calendar events can still display vibrant dithered colors.
 
 Light colors like **yellow automatically get black borders** for improved contrast and visibility on the e-paper display.
 

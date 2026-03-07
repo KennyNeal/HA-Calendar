@@ -22,15 +22,21 @@ except:
     font_small = ImageFont.load_default()
 
 # Draw some text (black on white)
-draw.text((50, 50), "Sharp Black Text Test", fill=(0, 0, 0), font=font_large)
-draw.text((50, 100), "The quick brown fox jumps over the lazy dog", fill=(0, 0, 0), font=font_small)
+draw.text((50, 50), "Black Text - Sharp!", fill=(0, 0, 0), font=font_large)
+draw.text((450, 50), "Red Text - Sharp!", fill=(255, 0, 0), font=font_large)
+draw.text((50, 100), "The quick brown fox jumps", fill=(0, 0, 0), font=font_small)
+draw.text((50, 130), "Yellow text is native!", fill=(255, 255, 0), font=font_small)
+draw.text((450, 130), "Green text is native!", fill=(0, 255, 0), font=font_small)
 
-# Draw colored boxes with labels
+# Draw colored boxes with labels (native and dithered colors)
 colors = [
-    ("Purple", (128, 0, 128)),
-    ("Orange", (255, 165, 0)),
-    ("Teal", (0, 128, 128)),
-    ("Yellow", (255, 255, 0))
+    ("Red (native)", (255, 0, 0)),
+    ("Yellow (native)", (255, 255, 0)),
+    ("Green (native)", (0, 255, 0)),
+    ("Blue (native)", (0, 0, 255)),
+    ("Purple (dithered)", (128, 0, 128)),
+    ("Orange (dithered)", (255, 165, 0)),
+    ("Teal (dithered)", (0, 128, 128)),
 ]
 
 y = 180
@@ -43,14 +49,16 @@ for name, rgb in colors:
 
 print("\nText Sharpness Test")
 print("=" * 60)
-print("\nComparing text quality with selective dithering:")
+print("\nComparing rendering with selective dithering:")
 print("-" * 60)
 print("\nWith SELECTIVE dithering:")
-print("  ✓ Black/white text stays sharp (not dithered)")
-print("  ✓ Colored areas get dithered (purple, orange, etc.)")
+print("  ✓ All 6 native colors stay sharp (black, white, red,")
+print("    yellow, green, blue) - not dithered")
+print("  ✓ Intermediate colors get dithered (purple, orange,")
+print("    teal, etc.)")
 print("\nWithout selective dithering:")
-print("  ✗ ALL pixels dithered (including text)")
-print("  ✗ Text looks fuzzy/noisy")
+print("  ✗ ALL pixels dithered (including native colors)")
+print("  ✗ Red, yellow, green, blue text looks fuzzy")
 print("-" * 60)
 
 # Save the original
@@ -82,7 +90,8 @@ print("✓ Saved: text_test_full_dither.png (everything dithered, text fuzzy)")
 
 print("\n" + "=" * 60)
 print("\nCompare the images:")
-print("  1. text_test_selective_dither.png - Text is crisp! ✓")
-print("  2. text_test_full_dither.png - Text is fuzzy ✗")
-print("\nZoom in on the black text to see the difference!")
+print("  1. text_test_selective_dither.png - Native colors crisp! ✓")
+print("  2. text_test_full_dither.png - Everything fuzzy ✗")
+print("\nZoom in on red, yellow, green, blue text to see they stay sharp!")
+print("Purple, orange, teal show dithering pattern (as expected).")
 print("=" * 60)

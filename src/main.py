@@ -202,9 +202,10 @@ def main():
 
             if sensor_value is not None:
                 display_label = sensor_label
+                display_value = sensor_value
                 if sensor_entity_id == 'sensor.outdoor_scene' and override_active:
-                    display_label = 'Outdoor Scene (Overridden)'
-                footer_sensor_text = f"{display_label}: {sensor_value}"
+                    display_value = f"{sensor_value} (Overridden)"
+                footer_sensor_text = f"{display_label}: {display_value}"
                 logger.debug(f"Footer sensor value: {footer_sensor_text}")
 
         # Determine date range based on view
