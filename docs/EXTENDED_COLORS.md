@@ -76,19 +76,19 @@ With **dithering enabled**, colors are approximated using patterns of pixels:
 calendars:
   - entity_id: "calendar.family"
     display_name: "Family"
-    color: "purple"      # → renders as blue
+    color: "purple"     
     
   - entity_id: "calendar.work"
     display_name: "Work"
-    color: "orange"      # → renders as yellow
+    color: "orange"     
     
   - entity_id: "calendar.gym"
     display_name: "Gym"
-    color: "teal"        # → renders as green
+    color: "teal"     
     
   - entity_id: "calendar.social"
     display_name: "Social"
-    color: "magenta"     # → renders as red
+    color: "magenta"  
 ```
 
 ## How the Mapping Works
