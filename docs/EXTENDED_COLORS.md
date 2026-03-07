@@ -2,6 +2,8 @@
 
 The HA-Calendar now supports **any common color name** for calendar assignments! The system uses **Floyd-Steinberg dithering** to approximate any color using patterns of the 6 available e-paper inks (black, white, red, yellow, green, blue).
 
+**Smart text preservation:** Black and white text stays perfectly sharp while colored areas are dithered - giving you vibrant colors without sacrificing readability!
+
 ## How Dithering Works
 
 **Dithering** creates the visual appearance of intermediate colors by arranging pixels of the available colors in patterns that your eye blends together:
@@ -114,13 +116,21 @@ The `test_full_palette.py` script creates two images:
 
 **Dithering creates a slightly "grainy" or textured appearance** as it uses patterns of pixels, but from normal viewing distance (1-2 feet), your brain blends these patterns into smooth intermediate colors. This is exactly how color photos appear in newspapers or how inkjet printers work!
 
+### Selective Dithering
+
+The system uses **selective dithering** to preserve text quality:
+- ✅ **Black and white pixels (text) stay perfectly sharp** - Not dithered at all
+- ✅ **Colored areas get dithered** - Purple, orange, teal blend smoothly
+
+This means calendar text remains crisp and readable while colored event indicators show their true colors!
+
 **Tradeoffs:**
 - ✅ **Pro:** You get access to the full color spectrum (purple, orange, brown, teal, etc.)
 - ✅ **Pro:** Colors look natural and recognizable from viewing distance  
-- ⚠️ **Note:** Up close, you'll see the pixel pattern (just like old newspaper photos)
-- ⚠️ **Note:** Very fine details may appear slightly less sharp
+- ✅ **Pro:** Text stays sharp and readable (no fuzzy edges)
+- ⚠️ **Note:** Up close on colored areas, you'll see the pixel pattern (just like old newspaper photos)
 
-For calendar displays where events are shown as colored bars or dots, dithering works perfectly!
+For calendar displays where events are shown as colored bars or dots with black text, dithering works perfectly!
 
 ## Disabling Dithering
 
