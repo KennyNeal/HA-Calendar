@@ -150,6 +150,27 @@ class BaseRenderer:
 
         return fonts
 
+    def is_light_color(self, rgb):
+        """
+        Determine if a color is light and needs a dark border for contrast.
+        
+        Uses relative luminance formula (ITU-R BT.709) to determine if the color
+        is too light for good visibility on a white background.
+        
+        Args:
+            rgb: RGB tuple (r, g, b)
+            
+        Returns:
+            bool: True if the color needs a dark border for contrast
+        """
+        r, g, b = rgb
+        # Calculate relative luminance (ITU-R BT.709)
+        luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        # Colors with luminance > 200 are considered too light
+        # This catches yellow (255,255,0) = 236.6 and white (255,255,255) = 255
+        # but not green (0,255,0) = 182.4, red (255,0,0) = 54.2, blue (0,0,255) = 18.4
+        return luminance > 200
+
     def create_canvas(self):
         """
         Create a blank canvas with white background.
@@ -519,7 +540,11 @@ class BaseRenderer:
         legend_y = footer_y + (footer_height - dot_size) // 2
 
         for i, (cal_name, cal_color) in enumerate(legend_items):
-            self.draw_box(draw, legend_x, legend_y, dot_size, dot_size, fill=cal_color)
+            # Add black border for light colors (yellow, white) for better contrast
+            outline_color = self.black if self.is_light_color(cal_color) else None
+            outline_width = 2 if outline_color else 1
+            self.draw_box(draw, legend_x, legend_y, dot_size, dot_size, 
+                         fill=cal_color, outline=outline_color, outline_width=outline_width)
             self.draw_text(
                 draw, cal_name,
                 legend_x + dot_size + dot_text_gap,
@@ -646,7 +671,11 @@ class BaseRenderer:
                 span_x = start_idx * col_width + 2
                 span_width = (end_idx - start_idx + 1) * col_width - 4
 
-                self.draw_box(draw, span_x, lane_y, span_width, lane_height - 2, fill=event.color)
+                # Draw colored bar with black border for light colors
+                outline_color = self.black if self.is_light_color(event.color) else None
+                outline_width = 1 if outline_color else 0
+                self.draw_box(draw, span_x, lane_y, span_width, lane_height - 2, 
+                             fill=event.color, outline=outline_color, outline_width=outline_width)
 
                 text_lines = self.wrap_text(
                     event.title,

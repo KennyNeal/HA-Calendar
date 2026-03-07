@@ -73,8 +73,10 @@ class EPaperDisplay:
 
     def quantize_image(self, image):
         """
-        Convert PIL Image to e-paper 7-color palette.
+        Convert PIL Image to e-paper 7-color palette with selective dithering.
         Uses the official Waveshare palette order.
+        
+        Preserves sharp black and white pixels (text) while dithering colored areas.
 
         Args:
             image: PIL Image object
@@ -82,6 +84,8 @@ class EPaperDisplay:
         Returns:
             PIL.Image: Quantized palette image
         """
+        from PIL import ImageChops
+        
         # Convert to RGB if needed
         if image.mode != 'RGB':
             image = image.convert('RGB')
@@ -100,10 +104,39 @@ class EPaperDisplay:
             + (0, 0, 0) * 249   # Fill remaining palette slots
         )
 
-        # Quantize to the 7-color palette (no dithering for solid colors)
-        quantized = image.convert("RGB").quantize(palette=pal_image, dither=Image.Dither.NONE)
-
-        return quantized
+        # Quantize to the 7-color palette with Floyd-Steinberg dithering
+        # This creates visual approximations of intermediate colors (purple, orange, etc.)
+        # by distributing pixels of the available colors
+        quantized = image.convert("RGB").quantize(palette=pal_image, dither=Image.Dither.FLOYDSTEINBERG)
+        
+        # Preserve sharp black and white pixels (text) by creating masks
+        # This keeps text crisp while allowing colored areas to dither
+        
+        # Create mask for pure black pixels
+        black_image = Image.new('RGB', image.size, (0, 0, 0))
+        black_mask = ImageChops.difference(image, black_image)
+        black_mask = black_mask.convert('L')
+        # Invert: 0 where black, 255 where not black
+        black_mask = ImageChops.invert(black_mask)
+        
+        # Create mask for pure white pixels  
+        white_image = Image.new('RGB', image.size, (255, 255, 255))
+        white_mask = ImageChops.difference(image, white_image)
+        white_mask = white_mask.convert('L')
+        # Invert: 0 where white, 255 where not white
+        white_mask = ImageChops.invert(white_mask)
+        
+        # Combine masks: text is where pixel is pure black OR pure white
+        text_mask = ImageChops.lighter(black_mask, white_mask)
+        
+        # Composite: use original sharp pixels where text_mask > 0, else use dithered
+        dithered_rgb = quantized.convert('RGB')
+        result = Image.composite(image, dithered_rgb, text_mask)
+        
+        # Convert final result to palette mode without dithering (preserve our composited pixels)
+        quantized_result = result.quantize(palette=pal_image, dither=Image.Dither.NONE)
+        
+        return quantized_result
 
     def _find_nearest_color(self, rgb):
         """

@@ -256,8 +256,11 @@ class TwoWeekRenderer(BaseRenderer):
             if current_y + bar_height > y + height:
                 break
 
-            # Draw colored bar as background for event
-            self.draw_box(draw, x, current_y, width, bar_height, fill=event.color)
+            # Draw colored bar with black border for light colors
+            outline_color = self.black if self.is_light_color(event.color) else None
+            outline_width = 1 if outline_color else 0
+            self.draw_box(draw, x, current_y, width, bar_height, 
+                         fill=event.color, outline=outline_color, outline_width=outline_width)
 
             # Draw each line of text in white on colored background
             text_y = current_y + 2

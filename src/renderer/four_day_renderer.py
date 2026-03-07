@@ -250,8 +250,11 @@ class FourDayRenderer(BaseRenderer):
             if event_y + bar_height > y + height:
                 break
 
-            # Draw colored bar
-            self.draw_box(draw, x, event_y, width, bar_height, fill=event.color)
+            # Draw colored bar with black border for light colors
+            outline_color = self.black if self.is_light_color(event.color) else None
+            outline_width = 1 if outline_color else 0
+            self.draw_box(draw, x, event_y, width, bar_height, 
+                         fill=event.color, outline=outline_color, outline_width=outline_width)
 
             text_y = event_y + 2
             for line in text_lines:
