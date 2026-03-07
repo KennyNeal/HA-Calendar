@@ -76,7 +76,8 @@ class EPaperDisplay:
         Convert PIL Image to e-paper 7-color palette with selective dithering.
         Uses the official Waveshare palette order.
         
-        Preserves sharp black and white pixels (text) while dithering colored areas.
+        Preserves all 6 native e-paper colors (black, white, red, yellow, green, blue)
+        while dithering intermediate colors (purple, orange, teal, etc.).
 
         Args:
             image: PIL Image object
@@ -109,29 +110,35 @@ class EPaperDisplay:
         # by distributing pixels of the available colors
         quantized = image.convert("RGB").quantize(palette=pal_image, dither=Image.Dither.FLOYDSTEINBERG)
         
-        # Preserve sharp black and white pixels (text) by creating masks
-        # This keeps text crisp while allowing colored areas to dither
+        # Preserve all 6 native e-paper colors (don't dither them)
+        # Only intermediate colors (purple, orange, teal, etc.) should be dithered
+        native_colors = [
+            (0, 0, 0),       # Black
+            (255, 255, 255), # White
+            (255, 0, 0),     # Red
+            (255, 255, 0),   # Yellow
+            (0, 255, 0),     # Green
+            (0, 0, 255)      # Blue
+        ]
         
-        # Create mask for pure black pixels
-        black_image = Image.new('RGB', image.size, (0, 0, 0))
-        black_mask = ImageChops.difference(image, black_image)
-        black_mask = black_mask.convert('L')
-        # Invert: 0 where black, 255 where not black
-        black_mask = ImageChops.invert(black_mask)
+        # Create mask for each native color
+        combined_mask = None
+        for color in native_colors:
+            color_image = Image.new('RGB', image.size, color)
+            color_diff = ImageChops.difference(image, color_image)
+            color_diff_L = color_diff.convert('L')
+            # Invert: 0 where color matches, 255 where different
+            color_mask = ImageChops.invert(color_diff_L)
+            
+            # Combine with previous masks
+            if combined_mask is None:
+                combined_mask = color_mask
+            else:
+                combined_mask = ImageChops.lighter(combined_mask, color_mask)
         
-        # Create mask for pure white pixels  
-        white_image = Image.new('RGB', image.size, (255, 255, 255))
-        white_mask = ImageChops.difference(image, white_image)
-        white_mask = white_mask.convert('L')
-        # Invert: 0 where white, 255 where not white
-        white_mask = ImageChops.invert(white_mask)
-        
-        # Combine masks: text is where pixel is pure black OR pure white
-        text_mask = ImageChops.lighter(black_mask, white_mask)
-        
-        # Composite: use original sharp pixels where text_mask > 0, else use dithered
+        # Composite: use original sharp pixels where native colors exist, else use dithered
         dithered_rgb = quantized.convert('RGB')
-        result = Image.composite(image, dithered_rgb, text_mask)
+        result = Image.composite(image, dithered_rgb, combined_mask)
         
         # Convert final result to palette mode without dithering (preserve our composited pixels)
         quantized_result = result.quantize(palette=pal_image, dither=Image.Dither.NONE)

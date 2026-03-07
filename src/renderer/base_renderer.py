@@ -96,6 +96,7 @@ class BaseRenderer:
         try:
             if regular_font and bold_font:
                 # Load regular weight fonts with optimized sizes for e-paper
+                fonts['tiny'] = ImageFont.truetype(regular_font, 10)    # For labels
                 fonts['small'] = ImageFont.truetype(regular_font, 13)   # Slightly larger
                 fonts['normal'] = ImageFont.truetype(regular_font, 15)  # Slightly larger
                 fonts['medium'] = ImageFont.truetype(regular_font, 17)  # Slightly larger
@@ -129,6 +130,7 @@ class BaseRenderer:
             else:
                 # Use default fonts
                 self.logger.warning("Preferred fonts not found, using default fonts (may look pixelated)")
+                fonts['tiny'] = ImageFont.load_default()
                 fonts['small'] = ImageFont.load_default()
                 fonts['normal'] = ImageFont.load_default()
                 fonts['medium'] = ImageFont.load_default()
@@ -139,6 +141,7 @@ class BaseRenderer:
                 fonts['weather_large'] = ImageFont.load_default()
         except Exception as e:
             self.logger.error(f"Error loading fonts: {e}. Using defaults.")
+            fonts['tiny'] = ImageFont.load_default()
             fonts['small'] = ImageFont.load_default()
             fonts['normal'] = ImageFont.load_default()
             fonts['medium'] = ImageFont.load_default()
@@ -472,21 +475,42 @@ class BaseRenderer:
         # Draw footer background (light gray or white)
         self.draw_box(draw, 0, footer_y, self.width, height, fill=self.white, outline=self.black, outline_width=1)
 
-        # Calculate vertical centering
-        text_y = footer_y + (height - 14) // 2  # Center normal font (14px) vertically
-
-        # Draw "Last Updated:" label and timestamp on the left
-        last_updated = datetime.now().strftime("%m/%d %I:%M %p")
-        updated_text = f"Last Updated: {last_updated}"
+        # Draw "Last Updated:" label and timestamp stacked on the left
+        last_updated_time = datetime.now().strftime("%m/%d %I:%M %p")
         
-        self.draw_text(draw, updated_text, 20, text_y, self.fonts['normal'], self.black)
+        # Stack vertically: "Last Updated" on top, time below
+        label_y = footer_y + 4
+        time_y = footer_y + 20
+        
+        self.draw_text(draw, "Last Updated", 10, label_y, self.fonts['tiny'], self.black)
+        self.draw_text(draw, last_updated_time, 10, time_y, self.fonts['small'], self.black)
 
-        # Draw optional sensor text on the right
+        # Draw optional sensor text on the right (stacked vertically)
         if footer_sensor_text:
-            bbox = draw.textbbox((0, 0), footer_sensor_text, font=self.fonts['normal'])
-            text_width = bbox[2] - bbox[0]
-            right_x = self.width - text_width - 20
-            self.draw_text(draw, footer_sensor_text, right_x, text_y, self.fonts['normal'], self.black)
+            # Parse the sensor text (e.g., "Outdoor Scene: LSU")
+            if ": " in footer_sensor_text:
+                label, value = footer_sensor_text.split(": ", 1)
+                
+                # Measure text widths for right alignment
+                bbox_label = draw.textbbox((0, 0), label, font=self.fonts['tiny'])
+                bbox_value = draw.textbbox((0, 0), value, font=self.fonts['small'])
+                label_width = bbox_label[2] - bbox_label[0]
+                value_width = bbox_value[2] - bbox_value[0]
+                
+                # Right align both label and value
+                right_x_label = self.width - label_width - 10
+                right_x_value = self.width - value_width - 10
+                
+                # Stack vertically: label on top, value below (both right-aligned)
+                self.draw_text(draw, label, right_x_label, label_y, self.fonts['tiny'], self.black)
+                self.draw_text(draw, value, right_x_value, time_y, self.fonts['small'], self.black)
+            else:
+                # No colon, just display as single text
+                bbox = draw.textbbox((0, 0), footer_sensor_text, font=self.fonts['small'])
+                text_width = bbox[2] - bbox[0]
+                right_x = self.width - text_width - 10
+                text_y = footer_y + (height - 14) // 2
+                self.draw_text(draw, footer_sensor_text, right_x, text_y, self.fonts['small'], self.black)
 
         return footer_y + height
 

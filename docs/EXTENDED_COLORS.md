@@ -118,11 +118,15 @@ The `test_full_palette.py` script creates two images:
 
 ### Selective Dithering
 
-The system uses **selective dithering** to preserve text quality:
-- ✅ **Black and white pixels (text) stay perfectly sharp** - Not dithered at all
-- ✅ **Colored areas get dithered** - Purple, orange, teal blend smoothly
+The system uses **selective dithering** to preserve native colors:
+- ✅ **All 6 native e-paper colors stay perfectly sharp** - Black, white, red, yellow, green, and blue are not dithered
+- ✅ **Intermediate colors get dithered** - Purple, orange, teal, brown, etc. blend smoothly
 
-This means calendar text remains crisp and readable while colored event indicators show their true colors!
+This means:
+- Text in any native color (black, red, blue, etc.) stays crisp
+- Borders using native colors remain sharp
+- Only intermediate colors show the dithering pattern
+- You get the best of both worlds: sharp native colors AND vibrant dithered colors!
 
 **Tradeoffs:**
 - ✅ **Pro:** You get access to the full color spectrum (purple, orange, brown, teal, etc.)
