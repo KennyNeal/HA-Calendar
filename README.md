@@ -235,22 +235,26 @@ The Waveshare 7.3" HAT (E) supports 6 hardware colors:
 - **Green**: Calendar events
 - **Blue**: Calendar events
 
-### Extended Color Palette
+### Extended Color Palette with Dithering
 
-**NEW!** You can now specify **any common color name** in your configuration (e.g., `purple`, `orange`, `teal`, `pink`), and the system will automatically map it to the nearest available e-paper color. This is especially useful for legend displays!
+**NEW!** You can now specify **any common color name** in your configuration (e.g., `purple`, `orange`, `teal`, `pink`), and the system uses **Floyd-Steinberg dithering** to approximate the color using patterns of the 6 available e-paper inks.
+
+**How it works:** Intermediate colors are created by arranging pixels of the base colors in patterns that your eye blends together - purple appears as a mix of red+blue pixels, orange as red+yellow, etc. This is the same technique used in color printing!
+
+Light colors like **yellow automatically get black borders** for improved contrast and visibility on the e-paper display.
 
 For example:
 ```yaml
 calendars:
   - entity_id: "calendar.family"
-    color: "purple"    # → renders as red
+    color: "purple"    # → dithered mix of red + blue pixels
   - entity_id: "calendar.work"
-    color: "orange"    # → renders as yellow
+    color: "orange"    # → dithered mix of red + yellow (with black border)
   - entity_id: "calendar.gym"
-    color: "teal"      # → renders as green
+    color: "teal"      # → dithered mix of green + blue pixels
 ```
 
-Over 50 color names are supported. See [docs/EXTENDED_COLORS.md](docs/EXTENDED_COLORS.md) for the full list and mapping details.
+Over 50 color names are supported. See [docs/EXTENDED_COLORS.md](docs/EXTENDED_COLORS.md) for the full list and dithering details.
 
 ## Configuration Options
 

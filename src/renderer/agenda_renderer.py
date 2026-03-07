@@ -191,13 +191,18 @@ class AgendaRenderer(BaseRenderer):
                 indicator_size = 10
                 indicator_x = padding + 10
                 indicator_y = content_y + 4
+                # Draw colored indicator with black border for light colors
+                outline_color = self.black if self.is_light_color(event.color) else None
+                outline_width = 2 if outline_color else 1
                 self.draw_box(
                     draw,
                     indicator_x,
                     indicator_y,
                     indicator_size,
                     indicator_size,
-                    fill=event.color
+                    fill=event.color,
+                    outline=outline_color,
+                    outline_width=outline_width
                 )
 
                 # Format event text

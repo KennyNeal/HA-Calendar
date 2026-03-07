@@ -1,10 +1,22 @@
 # Extended Color Palette Guide
 
-The HA-Calendar now supports **any common color name** for calendar assignments! While the e-paper display hardware only supports 6 colors (black, white, red, yellow, green, blue), you can now specify colors like `purple`, `orange`, `teal`, `pink`, etc. in your configuration.
+The HA-Calendar now supports **any common color name** for calendar assignments! The system uses **Floyd-Steinberg dithering** to approximate any color using patterns of the 6 available e-paper inks (black, white, red, yellow, green, blue).
 
-## How It Works
+## How Dithering Works
 
-The system automatically maps your chosen color to the nearest available e-paper color using intelligent color matching. This is particularly useful for the **legend display**, making it easier to identify calendars with more intuitive color names.
+**Dithering** creates the visual appearance of intermediate colors by arranging pixels of the available colors in patterns that your eye blends together:
+
+- **Purple** = Pattern of red + blue pixels that looks purple from viewing distance
+- **Orange** = Pattern of red + yellow pixels that looks orange
+- **Teal** = Pattern of green + blue pixels that looks teal/cyan
+- **Brown** = Pattern of red + yellow + black pixels that looks brown
+- **Pink** = Pattern of red + white pixels that looks pink
+
+This is the same technique used in old newspaper photos and color printers - you're not limited to just 6 solid colors anymore!
+
+## Automatic Contrast Enhancement
+
+Light colors (yellow and colors with high luminance) automatically get **black borders** for improved visibility on the e-paper display.
 
 ## Supported Color Names
 
@@ -28,27 +40,33 @@ Over 50 common color names are supported, including:
 - `cyan`, `aqua`, `turquoise`, `teal`
 
 ### Purples & Violets
-- `purple`, `violet`, `magenta`, `fuchsia`, `orchid`, `plum`, `lavender`, `indigo`
+- `purple`, `indigo`, `blueviolet`, `darkviolet`, `mediumpurple`, `rebeccapurple` (map to **blue**)
+- `violet`, `magenta`, `fuchsia`, `orchid`, `plum`, `lavender` (map to red/white)
+- Special: `lsu` for official LSU purple
 
 ### Grays
 - `gray`, `grey`, `silver`, `darkgray`, `lightgray`, `dimgray`
 
 ## Color Mapping Examples
 
-Here's how common colors map to the 6 available e-paper colors:
+With **dithering enabled**, colors are approximated using patterns of pixels:
 
-| Requested Color | Renders As |
-|----------------|------------|
-| `purple`       | **RED**    |
-| `orange`       | **YELLOW** |
-| `teal`         | **GREEN**  |
-| `cyan`         | **GREEN**  |
-| `magenta`      | **RED**    |
-| `brown`        | **RED**    |
-| `navy`         | **BLUE**   |
-| `gold`         | **YELLOW** |
-| `pink`         | **WHITE**  |
-| `gray`         | **WHITE**  |
+| Requested Color | How It Appears |
+|----------------|----------------|
+| `purple`       | Mix of **red + blue** pixels (looks purple) |
+| `indigo`       | Mix of **blue + black** pixels (looks deep purple/blue) |
+| `orange`       | Mix of **red + yellow** pixels (looks orange) |
+| `teal`         | Mix of **green + blue** pixels (looks teal) |
+| `cyan`         | Mix of **green + blue + white** pixels (looks cyan) |
+| `magenta`      | Mix of **red + blue** pixels (looks magenta) |
+| `fuchsia`      | Mix of **red + blue** pixels (looks bright magenta) |
+| `brown`        | Mix of **red + yellow + black** pixels (looks brown) |
+| `navy`         | Mix of **blue + black** pixels (looks dark blue) |
+| `gold`         | Mix of **yellow + red** pixels (looks gold) |
+| `pink`         | Mix of **red + white** pixels (looks pink) |
+| `gray`         | Mix of **black + white** pixels (looks gray) |
+
+**The exact appearance depends on Floyd-Steinberg dithering, which creates natural-looking intermediate colors!**
 
 ## Configuration Example
 
@@ -56,7 +74,7 @@ Here's how common colors map to the 6 available e-paper colors:
 calendars:
   - entity_id: "calendar.family"
     display_name: "Family"
-    color: "purple"      # → renders as red
+    color: "purple"      # → renders as blue
     
   - entity_id: "calendar.work"
     display_name: "Work"
@@ -81,26 +99,36 @@ The system uses **Euclidean distance in RGB color space** with a preference for 
 
 ## Testing Your Colors
 
-Run the test script to see which e-paper color any given color name will map to:
+Run the test scripts to see how colors will appear with dithering:
 
 ```bash
-python test_colors.py
+python test_full_palette.py    # Visual comparison of all colors before/after dithering
+python test_colors.py           # Quick listing of color mappings
 ```
 
-This will show you all supported colors and their mappings.
+The `test_full_palette.py` script creates two images:
+- `palette_preview.png` - Shows the true RGB colors you specify
+- `palette_dithered.png` - Shows how they'll actually appear on e-paper with dithering
 
-## Benefits for Legend Display
+## How Dithering Looks
 
-The main benefit of this feature is in the **legend** - instead of seeing:
-- ⬤ Family (red)
-- ⬤ Work (yellow)
+**Dithering creates a slightly "grainy" or textured appearance** as it uses patterns of pixels, but from normal viewing distance (1-2 feet), your brain blends these patterns into smooth intermediate colors. This is exactly how color photos appear in newspapers or how inkjet printers work!
 
-You can think of your calendars with more intuitive names:
-- ⬤ Family (purple)
-- ⬤ Work (orange)
+**Tradeoffs:**
+- ✅ **Pro:** You get access to the full color spectrum (purple, orange, brown, teal, etc.)
+- ✅ **Pro:** Colors look natural and recognizable from viewing distance  
+- ⚠️ **Note:** Up close, you'll see the pixel pattern (just like old newspaper photos)
+- ⚠️ **Note:** Very fine details may appear slightly less sharp
 
-Even though they still render as red and yellow on the hardware, the conceptual color assignment in your configuration is more meaningful.
+For calendar displays where events are shown as colored bars or dots, dithering works perfectly!
 
-## Future Enhancements
+## Disabling Dithering
 
-To get true intermediate colors like purple or orange on the display, dithering could be enabled. This would use a pattern of pixels (e.g., red + blue pixels for purple) to create the illusion of more colors. However, this would make the display more "grainy" and is not currently implemented.
+If you prefer solid colors only (no dithering), you can disable it in `src/display/epaper_driver.py`:
+
+```python
+# Change this line in quantize_image():
+quantized = image.convert("RGB").quantize(palette=pal_image, dither=Image.Dither.NONE)
+```
+
+With dithering disabled, all colors will snap to the nearest of the 6 base colors.

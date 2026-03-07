@@ -81,7 +81,7 @@ class ColorManager:
         'steelblue': (70, 130, 180),
         
         # Shades of purple/violet
-        'purple': (128, 0, 128),
+        'purple': (128, 0, 128),        # True purple - dithered as red+blue pixels
         'violet': (238, 130, 238),
         'magenta': (255, 0, 255),
         'fuchsia': (255, 0, 255),
@@ -89,6 +89,11 @@ class ColorManager:
         'plum': (221, 160, 221),
         'lavender': (230, 230, 250),
         'indigo': (75, 0, 130),
+        'blueviolet': (138, 43, 226),
+        'darkviolet': (148, 0, 211),
+        'mediumpurple': (147, 112, 219),
+        'rebeccapurple': (102, 51, 153),
+        'lsu': (70, 29, 124),           # Official LSU purple - maps to blue
         
         # Grays
         'gray': (128, 128, 128),
@@ -114,16 +119,17 @@ class ColorManager:
 
     def get_rgb(self, color_name):
         """
-        Get RGB tuple for a color name, quantized to nearest e-paper color.
+        Get RGB tuple for a color name.
         
         Accepts any common color name (e.g., 'purple', 'orange', 'teal') and
-        automatically maps it to the nearest available e-paper color.
+        returns the actual RGB value. The display driver will use dithering
+        to approximate intermediate colors.
 
         Args:
             color_name: Name of the color (e.g., 'red', 'purple', 'teal')
 
         Returns:
-            tuple: RGB tuple (r, g, b) from e-paper palette
+            tuple: RGB tuple (r, g, b) - actual color value (will be dithered by display)
         """
         color_lower = color_name.lower()
         
@@ -131,11 +137,9 @@ class ColorManager:
         if color_lower in self.EPAPER_COLORS:
             return self.EPAPER_COLORS[color_lower]
         
-        # Check if it's a known common color
+        # Check if it's a known common color - return actual RGB for dithering
         if color_lower in self.COMMON_COLORS:
-            rgb = self.COMMON_COLORS[color_lower]
-            # Quantize to nearest e-paper color
-            return self.quantize_to_palette(rgb)
+            return self.COMMON_COLORS[color_lower]
         
         # Default to black if unknown
         return self.EPAPER_COLORS['black']
@@ -144,20 +148,24 @@ class ColorManager:
         """
         Get the e-paper color name that a given color will be rendered as.
         
+        With dithering enabled, intermediate colors are approximated through
+        patterns of base colors, so this returns 'dithered' for non-base colors.
+        
         Args:
             color_name: Input color name (e.g., 'purple', 'orange')
             
         Returns:
-            str: Name of the e-paper color it will render as (e.g., 'red', 'blue')
+            str: Name of the e-paper color or 'dithered' for intermediate colors
         """
         rgb = self.get_rgb(color_name)
         
-        # Find which e-paper color this matches
+        # Find which e-paper color this matches exactly
         for name, color_rgb in self.EPAPER_COLORS.items():
             if color_rgb == rgb:
                 return name
         
-        return 'black'
+        # If not an exact match, it will be dithered
+        return 'dithered'
 
     def assign_calendar_colors(self, calendars):
         """

@@ -347,8 +347,11 @@ class MonthRenderer(BaseRenderer):
                 if current_y + dot_size > y + height:
                     break  # No more space
 
-            # Draw colored indicator
-            self.draw_box(draw, current_x, current_y, dot_size, dot_size, fill=event.color)
+            # Draw colored indicator with black border for light colors
+            outline_color = self.black if self.is_light_color(event.color) else None
+            outline_width = 1 if outline_color else 0
+            self.draw_box(draw, current_x, current_y, dot_size, dot_size, 
+                         fill=event.color, outline=outline_color, outline_width=outline_width)
             current_x += dot_size + 3
 
         # Show count if more events

@@ -100,8 +100,10 @@ class EPaperDisplay:
             + (0, 0, 0) * 249   # Fill remaining palette slots
         )
 
-        # Quantize to the 7-color palette (no dithering for solid colors)
-        quantized = image.convert("RGB").quantize(palette=pal_image, dither=Image.Dither.NONE)
+        # Quantize to the 7-color palette with Floyd-Steinberg dithering
+        # This creates visual approximations of intermediate colors (purple, orange, etc.)
+        # by distributing pixels of the available colors
+        quantized = image.convert("RGB").quantize(palette=pal_image, dither=Image.Dither.FLOYDSTEINBERG)
 
         return quantized
 
