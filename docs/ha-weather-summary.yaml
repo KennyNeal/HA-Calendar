@@ -1,0 +1,66 @@
+# HA Weather Summary — AI-Generated Text for the Agenda View
+#
+# This file contains example Home Assistant configuration to generate a
+# 2-3 line AI weather summary and store it in an input_text helper.
+# The HA-Calendar agenda view reads this value via the `weather_summary_sensor`
+# config key and displays it in the right panel between current conditions
+# and the 4-day forecast.
+#
+# Requirements:
+#   - A working AI conversation agent in HA (e.g., OpenAI, Google Generative AI,
+#     Anthropic, or a local model via Ollama integration)
+#   - An `input_text` helper to store the result
+#
+# ---------------------------------------------------------
+# 1. Create the input_text helper (configuration.yaml or via UI)
+# ---------------------------------------------------------
+
+input_text:
+  weather_summary:
+    name: Weather Summary
+    max: 255
+    icon: mdi:weather-partly-cloudy
+
+# ---------------------------------------------------------
+# 2. Automation to generate the summary (automations.yaml)
+# ---------------------------------------------------------
+#
+# This runs every hour on the hour. Adjust the trigger to taste.
+# Replace `conversation.chatgpt` with your actual AI agent entity ID.
+
+automation:
+  - alias: "Generate AI Weather Summary"
+    description: >
+      Calls the HA AI conversation agent with current weather data and stores
+      the result in input_text.weather_summary for the e-ink calendar display.
+    trigger:
+      - platform: time_pattern
+        minutes: "0"  # Run at the top of every hour
+      - platform: homeassistant
+        event: start  # Also run on HA startup
+    action:
+      - service: conversation.process
+        data:
+          agent_id: conversation.chatgpt  # <-- change to your AI agent entity ID
+          text: >
+            Write a plain-text weather summary for a small e-ink display.
+            Use exactly 2-3 short sentences. No markdown, no emojis, no bullet points.
+            Current conditions: {{ states('weather.forecast_home') }},
+            {{ state_attr('weather.forecast_home', 'temperature') }}{{ state_attr('weather.forecast_home', 'temperature_unit') }}.
+            Humidity: {{ state_attr('weather.forecast_home', 'humidity') }}%.
+            Wind: {{ state_attr('weather.forecast_home', 'wind_speed') }} {{ state_attr('weather.forecast_home', 'wind_speed_unit') }}.
+        response_variable: ai_response
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.weather_summary
+        data:
+          value: "{{ ai_response.response.speech.plain.speech[:255] }}"
+
+# ---------------------------------------------------------
+# 3. config/config.yaml entry for HA-Calendar
+# ---------------------------------------------------------
+#
+# Add this block to your config/config.yaml to enable the feature:
+#
+# weather_summary_sensor:
+#   entity_id: "input_text.weather_summary"
