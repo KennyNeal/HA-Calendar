@@ -101,11 +101,10 @@ The system uses **Euclidean distance in RGB color space** with a preference for 
 
 ## Testing Your Colors
 
-Run the test scripts to see how colors will appear with dithering:
+Run the test script to see how colors will appear with dithering:
 
 ```bash
-python test_full_palette.py    # Visual comparison of all colors before/after dithering
-python test_colors.py           # Quick listing of color mappings
+python tests/test_full_palette.py    # Visual comparison of all colors before/after dithering
 ```
 
 The `test_full_palette.py` script creates two images:

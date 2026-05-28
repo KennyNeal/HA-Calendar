@@ -158,35 +158,9 @@ Add this line (adjust path if needed):
 
 This will update the display every hour at the top of the hour.
 
-### 7. Git and GitHub Integration (Recommended)
+### 7. Keep Up to Date
 
-Using Git allows you to easily update the calendar software and switch between feature branches.
-
-#### Set Up Git
-
-```bash
-# Configure Git (if not already done)
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-```
-
-#### Working with Branches
-
-```bash
-# Fetch latest changes from GitHub
-git fetch origin
-
-# Switch to main branch
-git checkout main
-
-# Switch to a feature branch (e.g., Dynamic-size)
-git checkout Dynamic-size
-
-# Pull latest updates
-git pull
-```
-
-#### Update to Latest Version
+Pull the latest changes at any time:
 
 ```bash
 cd ~/HA-Calendar
@@ -194,9 +168,9 @@ git pull
 python3 src/main.py  # Test the changes
 ```
 
-**Note**: Your `config/config.yaml` file is automatically ignored by Git and won't be affected by updates.
+Your `config/config.yaml` is in `.gitignore` and will never be overwritten by updates.
 
-For detailed Git instructions, see **[docs/GIT_SETUP.md](docs/GIT_SETUP.md)**.
+For full Git instructions (branches, stashing, troubleshooting), see **[docs/GIT_SETUP.md](docs/GIT_SETUP.md)**.
 
 ## View Modes
 
@@ -353,14 +327,6 @@ You can use any common color name - see [docs/EXTENDED_COLORS.md](docs/EXTENDED_
 
 ## Development
 
-### Working with Git
-
-This project uses Git for version control. See **[docs/GIT_SETUP.md](docs/GIT_SETUP.md)** for:
-- Branch management
-- Getting updates from GitHub
-- Contributing changes
-- Troubleshooting Git issues
-
 ### Running in Mock Mode
 
 For development on machines without the e-paper hardware:
@@ -388,16 +354,22 @@ Then set `mock_mode: true` and run `python src/main.py`.
 ```
 HA-Calendar/
 ├── config/
-│   └── config.yaml
+│   ├── config.example.yaml   # Template – copy to config.yaml and edit
+│   └── config.yaml           # Your config (gitignored)
+├── docs/                     # Reference documentation
 ├── src/
-│   ├── main.py              # Entry point
-│   ├── ha_client.py         # HA API client
-│   ├── calendar_data.py     # Event processing
-│   ├── weather_data.py      # Weather processing
-│   ├── renderer/            # View renderers
-│   ├── display/             # E-paper driver
-│   └── utils/               # Utilities
-└── logs/
+│   ├── main.py               # Entry point
+│   ├── ha_client.py          # Home Assistant API client
+│   ├── calendar_data.py      # Calendar event processing
+│   ├── weather_data.py       # Weather data processing
+│   ├── show_pic.py           # Easter-egg picture display
+│   ├── webhook_server.py     # HTTP webhook server
+│   ├── renderer/             # View renderers (two_week, month, week, agenda, four_day)
+│   ├── display/              # E-paper display driver
+│   └── utils/                # Logger, color manager, state manager
+├── tests/                    # Development test scripts
+├── waveshare_epd/            # Waveshare e-Paper library
+└── logs/                     # Runtime logs (gitignored)
 ```
 
 ## Dependencies
@@ -408,9 +380,9 @@ HA-Calendar/
 - Pillow
 - python-dateutil
 - pytz
-- RPi.GPIO
-- spidev
-- Waveshare e-Paper library
+- RPi.GPIO *(Raspberry Pi only)*
+- spidev *(Raspberry Pi only)*
+- Waveshare e-Paper library *(included in `waveshare_epd/`)*
 
 ## License
 
@@ -424,15 +396,6 @@ This project is provided as-is for personal use.
 ## Support
 
 For issues and questions:
-1. Check logs in `logs/calendar.log`
-2. Review this README
-3. Check config.yaml settings
-4. Test in mock mode to isolate issues
-
-## Future Enhancements
-
-- Touch button support for manual view cycling
-- Multi-day event spanning across cells
-- Battery level indicator
-- Custom color schemes
-- Multiple timezone support
+1. Check logs: `tail -f logs/calendar.log`
+2. Review this README and the docs in `docs/`
+3. Test in mock mode to isolate issues
