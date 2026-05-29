@@ -19,7 +19,7 @@ class MonthRenderer(BaseRenderer):
         super().__init__(config, color_manager)
         self.view_config = config['views']['month']
 
-    def render(self, events_by_day, weather_info, footer_sensor_text=None):
+    def render(self, events_by_day, weather_info, footer_sensor_text=None, **kwargs):
         """
         Render month calendar view.
 
