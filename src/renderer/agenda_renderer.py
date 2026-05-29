@@ -18,7 +18,7 @@ class AgendaRenderer(BaseRenderer):
         super().__init__(config, color_manager)
         self.view_config = config['views']['agenda']
 
-    def render(self, events_by_day, weather_info, footer_sensor_text=None):
+    def render(self, events_by_day, weather_info, footer_sensor_text=None, weather_summary=None):
         """
         Render agenda list view.
 
@@ -26,6 +26,7 @@ class AgendaRenderer(BaseRenderer):
             events_by_day: Dictionary mapping date to DayEvents
             weather_info: WeatherInfo object
             footer_sensor_text: Optional sensor text for footer
+            weather_summary: Optional AI-generated weather summary string
 
         Returns:
             PIL.Image: Rendered calendar image
@@ -379,7 +380,22 @@ class AgendaRenderer(BaseRenderer):
                         self.draw_text(draw, humidity_text, x_pos, high_low_y, temp_font, self.black)
                         
                         wind_on_same_line = True
-            
+
+            # Draw AI weather summary between current conditions and forecast
+            if weather_summary:
+                summary_y = high_low_y + 32
+                summary_font = self.fonts['normal']
+                summary_max_width = right_width - 24
+                lines = self.wrap_text(weather_summary, summary_max_width, summary_font, draw, max_lines=3)
+                line_height = 20
+                for i, line in enumerate(lines):
+                    self.draw_text(
+                        draw, line,
+                        weather_x_center, summary_y + i * line_height,
+                        summary_font, self.black,
+                        align='center', max_width=summary_max_width
+                    )
+
             # Calculate positions for forecast - bottoms of temps 3 pixels above footer
             footer_y = self.height - footer_height
             forecast_y = footer_y - 95

@@ -31,6 +31,12 @@ footer_sensor:
   entity_id: "sensor.outdoor_scene"  # Set to null to disable
   label: "Outdoor Scene"  # Label to display before the sensor value
 
+# Optional AI-generated weather summary (agenda view only)
+# Populate this sensor in Home Assistant using an LLM automation.
+# See docs/ha-weather-summary.yaml for an example automation.
+weather_summary_sensor:
+  entity_id: null  # e.g., "input_text.weather_summary" — set to null to disable
+
 # View selector
 # This input_select entity determines which view to display
 view_selector:

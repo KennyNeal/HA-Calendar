@@ -145,6 +145,11 @@ def main():
             sensor_entity_id = footer_sensor_config.get('entity_id')
             sensor_label = footer_sensor_config.get('label', 'Sensor')
 
+        weather_summary_entity_id = None
+        weather_summary_config = config.get('weather_summary_sensor')
+        if weather_summary_config:
+            weather_summary_entity_id = weather_summary_config.get('entity_id')
+
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {
                 'view': executor.submit(ha_client.get_current_view),
@@ -156,12 +161,17 @@ def main():
                 if sensor_entity_id == 'sensor.outdoor_scene':
                     futures['override'] = executor.submit(ha_client.get_state, override_entity_id)
 
+            if weather_summary_entity_id:
+                futures['weather_summary'] = executor.submit(ha_client.get_state, weather_summary_entity_id)
+
             logger.info("Fetching current view selection...")
             logger.info("Fetching weather data...")
             if sensor_entity_id:
                 logger.info(f"Fetching footer sensor: {sensor_entity_id}")
                 if sensor_entity_id == 'sensor.outdoor_scene':
                     logger.info(f"Fetching outdoor scene override: {override_entity_id}")
+            if weather_summary_entity_id:
+                logger.info(f"Fetching weather summary sensor: {weather_summary_entity_id}")
 
             current_view = futures['view'].result()
             logger.info(f"Current view: {current_view}")
@@ -207,6 +217,17 @@ def main():
                     display_value = f"{sensor_value} (Overridden)"
                 footer_sensor_text = f"{display_label}: {display_value}"
                 logger.debug(f"Footer sensor value: {footer_sensor_text}")
+
+            weather_summary = None
+            if 'weather_summary' in futures:
+                try:
+                    summary_data = futures['weather_summary'].result()
+                    raw_summary = summary_data.get('state', '')
+                    if raw_summary and raw_summary.lower() not in {'unknown', 'unavailable', ''}:
+                        weather_summary = raw_summary
+                        logger.debug(f"Weather summary: {weather_summary}")
+                except Exception as e:
+                    logger.warning(f"Failed to fetch weather summary sensor {weather_summary_entity_id}: {e}")
 
         # Determine date range based on view
         today = datetime.now().date()
@@ -274,7 +295,7 @@ def main():
 
         # Render calendar image
         logger.info("Rendering calendar image...")
-        image = renderer.render(events_by_day, weather_info, footer_sensor_text)
+        image = renderer.render(events_by_day, weather_info, footer_sensor_text, weather_summary=weather_summary)
 
         # Initialize and update display
         logger.info("Initializing display...")
