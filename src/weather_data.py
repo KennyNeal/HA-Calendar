@@ -32,9 +32,24 @@ class WeatherInfo:
 class WeatherDataProcessor:
     """Processes weather data from Home Assistant."""
 
-    # Map HA weather conditions to Weather Icons font Unicode characters
-    # Weather Icons font: https://erikflowers.github.io/weather-icons/
-    # Install font file: weathericons-regular-webfont.ttf
+    WEATHER_COLORS = {
+        'sunny':            'gold',
+        'clear-night':      'blue',
+        'partlycloudy':     'gold',
+        'cloudy':           'black',
+        'rainy':            'blue',
+        'pouring':          'blue',
+        'snowy':            'blue',
+        'snowy-rainy':      'blue',
+        'lightning':        'gold',
+        'lightning-rainy':  'gold',
+        'hail':             'blue',
+        'windy':            'black',
+        'windy-variant':    'black',
+        'fog':              'black',
+        'exceptional':      'red',
+    }
+
     WEATHER_ICONS = {
         'clear-night': '\uf02e',      # Night
         'cloudy': '\uf013',           # Cloud
@@ -218,15 +233,7 @@ class WeatherDataProcessor:
             return weather_info
 
         except Exception as e:
-            self.logger.error(f"Failed to parse weather data: {e}")
-            import traceback
-            self.logger.error(traceback.format_exc())
-            return None
-
-        except Exception as e:
-            self.logger.error(f"Failed to parse weather data: {e}")
-            import traceback
-            self.logger.error(traceback.format_exc())
+            self.logger.error(f"Failed to parse weather data: {e}", exc_info=True)
             return None
 
     def format_weather_text(self, weather_info):
@@ -288,38 +295,10 @@ class WeatherDataProcessor:
         return self.WEATHER_ICONS.get(condition_key, '\uf03b')  # Default to exceptional
 
     def get_weather_icon_with_color(self, condition):
-        """
-        Get Weather Icons font character with appropriate color for e-paper display.
-
-        Args:
-            condition: Weather condition string (e.g., 'sunny', 'rainy')
-
-        Returns:
-            tuple: (icon, color_name) - Weather icon character and e-paper color
-        """
-        # Map weather conditions to colors for e-paper display
-        WEATHER_COLORS = {
-            'sunny': 'gold',             # Bright sun - gold is more visible than yellow
-            'clear-night': 'blue',       # Night
-            'partlycloudy': 'gold',      # Sun behind cloud
-            'cloudy': 'black',           # Gray cloud
-            'rainy': 'blue',             # Rain
-            'pouring': 'blue',           # Heavy rain
-            'snowy': 'blue',             # Snow
-            'snowy-rainy': 'blue',       # Mixed precipitation
-            'lightning': 'gold',         # Lightning - bright gold
-            'lightning-rainy': 'gold',   # Thunder with rain
-            'hail': 'blue',              # Hail
-            'windy': 'black',            # Wind
-            'windy-variant': 'black',    # Wind variant
-            'fog': 'black',              # Fog
-            'exceptional': 'red',        # Warning/alert
-        }
-        
+        """Returns (icon_char, color_name) for the given weather condition."""
         condition_key = condition.lower() if condition else None
         icon = self.WEATHER_ICONS.get(condition_key, '\uf03b')
-        color = WEATHER_COLORS.get(condition_key, 'black')
-        
+        color = self.WEATHER_COLORS.get(condition_key, 'black')
         return icon, color
 
     def format_weather_with_icon(self, weather_info):

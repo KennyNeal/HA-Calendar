@@ -2,6 +2,7 @@
 
 import sys
 import os
+import time
 import yaml
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -10,10 +11,9 @@ from pathlib import Path
 
 try:
     import fcntl
-except ImportError:  # Windows
+except ImportError:
     fcntl = None
 
-# Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utils.logger import setup_logger, get_logger
@@ -25,122 +25,127 @@ from weather_data import WeatherDataProcessor
 from display.epaper_driver import EPaperDisplay
 from renderer.two_week_renderer import TwoWeekRenderer
 
+RETRY_INTERVAL = 300  # seconds between connectivity retries when HA is unreachable
+MAX_RETRIES = 12      # give up after 1 hour (12 × 5 min)
+
 
 def load_config():
-    """
-    Load configuration from YAML file.
-
-    Returns:
-        dict: Configuration dictionary
-
-    Raises:
-        SystemExit: If config file not found or invalid
-    """
     config_path = Path(__file__).parent.parent / 'config' / 'config.yaml'
-
     if not config_path.exists():
         print(f"ERROR: Configuration file not found: {config_path}")
         print("Please copy config/config.example.yaml to config/config.yaml and configure it.")
         sys.exit(1)
-
     try:
         with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        return config
+            return yaml.safe_load(f)
     except Exception as e:
         print(f"ERROR: Failed to load configuration: {e}")
         sys.exit(1)
 
 
 def select_renderer(view_name, config, color_manager):
-    """
-    Select appropriate renderer based on view name.
-
-    Args:
-        view_name: View name ('two_week', 'month', 'week', 'agenda')
-        config: Configuration dictionary
-        color_manager: ColorManager instance
-
-    Returns:
-        BaseRenderer: Selected renderer instance
-    """
     logger = get_logger()
-
-    # Import renderers as needed
     if view_name == 'two_week':
         return TwoWeekRenderer(config, color_manager)
-    elif view_name == 'four_day':
-        try:
-            from renderer.four_day_renderer import FourDayRenderer
-            return FourDayRenderer(config, color_manager)
-        except ImportError:
-            logger.warning("FourDayRenderer not available, using TwoWeekRenderer")
-            return TwoWeekRenderer(config, color_manager)
-    elif view_name == 'month':
-        try:
-            from renderer.month_renderer import MonthRenderer
-            return MonthRenderer(config, color_manager)
-        except ImportError:
-            logger.warning("MonthRenderer not available, using TwoWeekRenderer")
-            return TwoWeekRenderer(config, color_manager)
-    elif view_name == 'week':
-        try:
-            from renderer.week_renderer import WeekRenderer
-            return WeekRenderer(config, color_manager)
-        except ImportError:
-            logger.warning("WeekRenderer not available, using TwoWeekRenderer")
-            return TwoWeekRenderer(config, color_manager)
-    elif view_name == 'agenda':
-        try:
-            from renderer.agenda_renderer import AgendaRenderer
-            return AgendaRenderer(config, color_manager)
-        except ImportError:
-            logger.warning("AgendaRenderer not available, using TwoWeekRenderer")
-            return TwoWeekRenderer(config, color_manager)
-    else:
+    renderer_map = {
+        'four_day': ('renderer.four_day_renderer', 'FourDayRenderer'),
+        'month':    ('renderer.month_renderer',    'MonthRenderer'),
+        'week':     ('renderer.week_renderer',     'WeekRenderer'),
+        'agenda':   ('renderer.agenda_renderer',   'AgendaRenderer'),
+    }
+    if view_name not in renderer_map:
         logger.warning(f"Unknown view '{view_name}', using TwoWeekRenderer")
         return TwoWeekRenderer(config, color_manager)
+    module_name, class_name = renderer_map[view_name]
+    try:
+        import importlib
+        module = importlib.import_module(module_name)
+        return getattr(module, class_name)(config, color_manager)
+    except (ImportError, AttributeError):
+        logger.warning(f"{class_name} not available, using TwoWeekRenderer")
+        return TwoWeekRenderer(config, color_manager)
+
+
+def _render_offline_screen(config):
+    """Build a PIL image showing the network-unavailable message."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    w = config['display']['width']
+    h = config['display']['height']
+    image = Image.new('RGB', (w, h), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
+
+    font_bold = font_normal = None
+    for path in [
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+        'C:/Windows/Fonts/arialbd.ttf',
+    ]:
+        if os.path.exists(path):
+            try:
+                font_bold = ImageFont.truetype(path, 36)
+                font_normal = ImageFont.truetype(path, 20)
+            except Exception:
+                pass
+            break
+    if not font_bold:
+        font_bold = font_normal = ImageFont.load_default()
+
+    now_str = datetime.now().strftime("%I:%M %p  •  %b %d, %Y")
+    lines = [
+        ("Network Unavailable", font_bold, (0, 0, 0)),
+        (now_str, font_normal, (100, 100, 100)),
+        (f"Retrying every {RETRY_INTERVAL // 60} minutes", font_normal, (100, 100, 100)),
+    ]
+
+    line_gap = 14
+    line_heights = [draw.textbbox((0, 0), t, font=f)[3] - draw.textbbox((0, 0), t, font=f)[1]
+                    for t, f, _ in lines]
+    total_h = sum(line_heights) + line_gap * len(lines)
+    y = max(0, (h - total_h) // 2)
+
+    for (text, font, color), lh in zip(lines, line_heights):
+        bbox = draw.textbbox((0, 0), text, font=font)
+        x = max(0, (w - (bbox[2] - bbox[0])) // 2)
+        draw.text((x, y), text, font=font, fill=color)
+        y += lh + line_gap
+
+    return image
 
 
 def main():
-    """Main execution function."""
+    """Run one display update cycle. Returns False if HA was unreachable."""
     start_time = datetime.now()
-
-    # Load configuration
     config = load_config()
-
-    # Setup logging
     logger = setup_logger(config)
-    logger.info("="* 60)
+    logger.info("=" * 60)
     logger.info("HA-Calendar Display Update Starting")
-    logger.info("="* 60)
+    logger.info("=" * 60)
 
+    display = None
     try:
-        # Initialize components
-        logger.info("Initializing components...")
         color_manager = ColorManager(config)
-        assigned_colors = color_manager.assign_calendar_colors(config['calendars'])
-
-        # Debug: Log calendar color assignments
-        logger.debug("Calendar color assignments from config:")
-        for calendar in config['calendars']:
-            logger.debug(f"  {calendar['entity_id']}: color={calendar.get('color', 'auto')}")
-        logger.debug("ColorManager assigned colors:")
-        for entity_id, color_info in assigned_colors.items():
-            logger.debug(f"  {entity_id}: {color_info['name']} RGB{color_info['rgb']}")
-
+        color_manager.assign_calendar_colors(config['calendars'])
         ha_client = HomeAssistantClient(config)
         calendar_processor = CalendarDataProcessor(color_manager)
         weather_processor = WeatherDataProcessor()
+
+        if not ha_client.is_reachable():
+            logger.warning("Home Assistant unreachable — showing offline screen")
+            display = EPaperDisplay(config)
+            display.init_display()
+            display.display_image(_render_offline_screen(config))
+            display.sleep()
+            logger.info("=" * 60)
+            return False
+
         display = EPaperDisplay(config)
 
-        # Fetch view, weather, and footer sensor in parallel
         footer_sensor_text = None
-        footer_sensor_config = config.get('footer_sensor')
         sensor_entity_id = None
         sensor_label = 'Sensor'
         override_entity_id = 'input_select.outdoor_scene_override'
-
+        footer_sensor_config = config.get('footer_sensor')
         if footer_sensor_config:
             sensor_entity_id = footer_sensor_config.get('entity_id')
             sensor_label = footer_sensor_config.get('label', 'Sensor')
@@ -150,44 +155,25 @@ def main():
         if weather_summary_config:
             weather_summary_entity_id = weather_summary_config.get('entity_id')
 
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        logger.info("Fetching data from Home Assistant...")
+        with ThreadPoolExecutor(max_workers=6) as executor:
             futures = {
-                'view': executor.submit(ha_client.get_current_view),
-                'weather': executor.submit(ha_client.get_weather)
+                'view':     executor.submit(ha_client.get_current_view),
+                'weather':  executor.submit(ha_client.get_weather),
+                'forecast': executor.submit(ha_client.get_weather_forecast),
             }
-
             if sensor_entity_id:
                 futures['footer'] = executor.submit(ha_client.get_state, sensor_entity_id)
                 if sensor_entity_id == 'sensor.outdoor_scene':
                     futures['override'] = executor.submit(ha_client.get_state, override_entity_id)
-
             if weather_summary_entity_id:
                 futures['weather_summary'] = executor.submit(ha_client.get_state, weather_summary_entity_id)
-
-            logger.info("Fetching current view selection...")
-            logger.info("Fetching weather data...")
-            if sensor_entity_id:
-                logger.info(f"Fetching footer sensor: {sensor_entity_id}")
-                if sensor_entity_id == 'sensor.outdoor_scene':
-                    logger.info(f"Fetching outdoor scene override: {override_entity_id}")
-            if weather_summary_entity_id:
-                logger.info(f"Fetching weather summary sensor: {weather_summary_entity_id}")
 
             current_view = futures['view'].result()
             logger.info(f"Current view: {current_view}")
 
             weather_data = futures['weather'].result()
-            
-            # Try to get forecast data from the weather service
-            forecast_data = None
-            try:
-                logger.debug("Calling weather.get_forecasts service...")
-                forecast_data = ha_client.get_weather_forecast()
-                if forecast_data:
-                    logger.debug("Forecast service retrieved successfully")
-            except Exception as e:
-                logger.warning(f"Weather forecast service error: {e}")
-            
+            forecast_data = futures['forecast'].result()
             weather_info = weather_processor.parse_weather(weather_data, forecast_data)
 
             sensor_value = None
@@ -203,182 +189,148 @@ def main():
                 try:
                     override_data = futures['override'].result()
                     override_state = str(override_data.get('state', '')).strip().lower()
-                    override_active = override_state not in {
-                        '', 'auto', 'none', 'off', 'unknown', 'unavailable'
-                    }
-                    logger.debug(f"Outdoor scene override state: {override_state} (active={override_active})")
+                    override_active = override_state not in {'', 'auto', 'none', 'off', 'unknown', 'unavailable'}
                 except Exception as e:
-                    logger.warning(f"Failed to fetch outdoor scene override {override_entity_id}: {e}")
+                    logger.warning(f"Failed to fetch outdoor scene override: {e}")
 
             if sensor_value is not None:
-                display_label = sensor_label
                 display_value = sensor_value
                 if sensor_entity_id == 'sensor.outdoor_scene' and override_active:
                     display_value = f"{sensor_value} (Overridden)"
-                footer_sensor_text = f"{display_label}: {display_value}"
-                logger.debug(f"Footer sensor value: {footer_sensor_text}")
+                footer_sensor_text = f"{sensor_label}: {display_value}"
 
             weather_summary = None
             if 'weather_summary' in futures:
                 try:
                     summary_data = futures['weather_summary'].result()
-                    raw_summary = summary_data.get('state', '')
-                    if raw_summary and raw_summary.lower() not in {'unknown', 'unavailable', ''}:
-                        weather_summary = raw_summary
-                        logger.debug(f"Weather summary: {weather_summary}")
+                    raw = summary_data.get('state', '')
+                    if raw and raw.lower() not in {'unknown', 'unavailable', ''}:
+                        weather_summary = raw
                 except Exception as e:
-                    logger.warning(f"Failed to fetch weather summary sensor {weather_summary_entity_id}: {e}")
+                    logger.warning(f"Failed to fetch weather summary: {e}")
 
-        # Determine date range based on view
         today = datetime.now().date()
         if current_view == 'month':
-            # For month view, get full month
             start_date = datetime(today.year, today.month, 1)
-            if today.month == 12:
-                end_date = datetime(today.year + 1, 1, 1)
-            else:
-                end_date = datetime(today.year, today.month + 1, 1)
+            end_date = (
+                datetime(today.year + 1, 1, 1) if today.month == 12
+                else datetime(today.year, today.month + 1, 1)
+            )
         else:
-            # For other views, get 14 days ahead
             start_date = datetime.combine(today, datetime.min.time())
             end_date = start_date + timedelta(days=14)
 
-        # Fetch calendar events
-        logger.info(f"Fetching calendar events from {start_date.date()} to {end_date.date()}...")
+        logger.info(f"Fetching calendar events {start_date.date()} to {end_date.date()}...")
         all_events = ha_client.get_all_calendar_events(start_date, end_date)
-
-        # Process calendar events
-        logger.debug("Processing calendar events...")
         parsed_events = calendar_processor.parse_all_events(all_events)
 
-        # Group events by day
         if current_view == 'two_week':
-            view_config = config['views']['two_week']
-            max_per_day = view_config.get('max_events_per_day', 3)
-            events_by_day = calendar_processor.get_events_for_range(
-                parsed_events,
-                days_ahead=14,
-                max_per_day=max_per_day
-            )
+            max_per_day = config['views']['two_week'].get('max_events_per_day', 3)
+            events_by_day = calendar_processor.get_events_for_range(parsed_events, days_ahead=14, max_per_day=max_per_day)
         elif current_view == 'week':
-            view_config = config['views']['week']
-            max_per_day = view_config.get('max_events_per_day', 5)
-            events_by_day = calendar_processor.get_events_for_range(
-                parsed_events,
-                days_ahead=7,
-                max_per_day=max_per_day
-            )
+            max_per_day = config['views']['week'].get('max_events_per_day', 5)
+            events_by_day = calendar_processor.get_events_for_range(parsed_events, days_ahead=7, max_per_day=max_per_day)
         elif current_view == 'month':
-            events_by_day = calendar_processor.get_events_for_month(
-                parsed_events,
-                today.year,
-                today.month
-            )
-            view_config = config['views']['month']
-            max_per_day = view_config.get('max_events_per_day', 2)
+            max_per_day = config['views']['month'].get('max_events_per_day', 2)
+            events_by_day = calendar_processor.get_events_for_month(parsed_events, today.year, today.month)
             events_by_day = calendar_processor.limit_events_per_day(events_by_day, max_per_day)
         elif current_view == 'agenda':
-            view_config = config['views']['agenda']
-            days_ahead = view_config.get('days_ahead', 14)
-            events_by_day = calendar_processor.get_events_for_range(
-                parsed_events,
-                days_ahead=days_ahead,
-                max_per_day=None  # Show all events in agenda view
-            )
+            days_ahead = config['views']['agenda'].get('days_ahead', 14)
+            events_by_day = calendar_processor.get_events_for_range(parsed_events, days_ahead=days_ahead, max_per_day=None)
         else:
-            # Default to two-week
             events_by_day = calendar_processor.get_events_for_range(parsed_events, days_ahead=14)
 
-        # Select and create renderer
-        logger.info(f"Creating {current_view} renderer...")
+        logger.info(f"Rendering {current_view} view...")
         renderer = select_renderer(current_view, config, color_manager)
-
-        # Render calendar image
-        logger.info("Rendering calendar image...")
         image = renderer.render(events_by_day, weather_info, footer_sensor_text, weather_summary=weather_summary)
 
-        # Initialize and update display
-        logger.info("Initializing display...")
-        display.init_display()
-
         logger.info("Updating display...")
+        display.init_display()
         display.display_image(image)
-
-        # Put display to sleep to save power
         display.sleep()
 
-        # Save state for health endpoint
-        save_state(
-            last_updated=datetime.now().isoformat(),
-            current_view=current_view
-        )
+        save_state(last_updated=datetime.now().isoformat(), current_view=current_view)
 
-        # Log completion
         elapsed = (datetime.now() - start_time).total_seconds()
-        logger.info(f"Display update completed successfully in {elapsed:.2f} seconds")
-        logger.info("="* 60)
+        logger.info(f"Update completed in {elapsed:.2f}s")
+        logger.info("=" * 60)
+        return True
 
     except KeyboardInterrupt:
         logger.info("Update interrupted by user")
         sys.exit(0)
     except Exception as e:
         logger.error(f"Fatal error during update: {e}", exc_info=True)
-
-        # Try to show error on display
         try:
             from PIL import Image, ImageDraw, ImageFont
-            error_image = Image.new('RGB', (800, 480), (255, 255, 255))
-            draw = ImageDraw.Draw(error_image)
+            w = config['display']['width']
+            h = config['display']['height']
+            err_img = Image.new('RGB', (w, h), (255, 255, 255))
+            draw = ImageDraw.Draw(err_img)
             font = ImageFont.load_default()
-
-            error_text = f"ERROR: {str(e)}\n\nCheck logs for details."
-            draw.text((20, 20), error_text, font=font, fill=(0, 0, 0))
-
-            display = EPaperDisplay(config)
+            draw.text((20, 20), f"ERROR: {str(e)[:120]}", font=font, fill=(0, 0, 0))
+            draw.text((20, 40), "Check logs for details.", font=font, fill=(0, 0, 0))
+            if display is None:
+                display = EPaperDisplay(config)
             display.init_display()
-            display.display_image(error_image)
+            display.display_image(err_img)
             display.sleep()
-        except:
-            pass  # If error display fails, just log
-
-        logger.error("Update failed")
-        logger.info("="* 60)
+        except Exception:
+            pass
         sys.exit(1)
 
 
-if __name__ == '__main__':
-    # Use file locking to prevent concurrent display access
-    lock_file = os.path.join(tempfile.gettempdir(), 'ha-calendar.lock')
-    lock_fd = None
-
+def _acquire_lock(lock_file):
+    lock_fd = open(lock_file, 'a+')
     try:
-        # Try to acquire lock
-        lock_fd = open(lock_file, 'a+')
-        lock_fd.write('1')
-        lock_fd.flush()
-
         if fcntl:
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         elif os.name == 'nt':
             import msvcrt
+            lock_fd.write('1')
+            lock_fd.flush()
             msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
-
-        # Lock acquired, run main
-        main()
-
     except OSError:
-        # Could not acquire lock - another instance is running
-        print("Another calendar update is already running. Exiting.")
-        sys.exit(0)
+        lock_fd.close()
+        raise
+    return lock_fd
+
+
+def _release_lock(lock_fd):
+    try:
+        if fcntl:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        elif os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
+    except Exception:
+        pass
     finally:
-        # Release lock
-        if lock_fd:
-            try:
-                if fcntl:
-                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
-                elif os.name == 'nt':
-                    import msvcrt
-                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
-                lock_fd.close()
-            except:
-                pass
+        lock_fd.close()
+
+
+if __name__ == '__main__':
+    lock_file = os.path.join(tempfile.gettempdir(), 'ha-calendar.lock')
+    retries = 0
+
+    while retries <= MAX_RETRIES:
+        try:
+            lock_fd = _acquire_lock(lock_file)
+        except OSError:
+            print("Another calendar update is already running. Exiting.")
+            sys.exit(0)
+
+        try:
+            result = main()
+        finally:
+            _release_lock(lock_fd)
+
+        if result is not False:
+            break  # Success or fatal error (sys.exit already called)
+
+        retries += 1
+        if retries > MAX_RETRIES:
+            get_logger().error(f"HA unreachable after {MAX_RETRIES} retries. Giving up.")
+            break
+        get_logger().info(f"Retrying in {RETRY_INTERVAL // 60} minutes (attempt {retries}/{MAX_RETRIES})...")
+        time.sleep(RETRY_INTERVAL)
