@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, date, time, timedelta
 from dateutil import parser
 from collections import defaultdict
+import pytz
 from utils.logger import get_logger
 
 
@@ -60,12 +61,9 @@ class CalendarDataProcessor:
 
             # Check if it's an all-day event (has 'date' key)
             if 'date' in start_data:
-                # All-day event - make timezone-aware
                 start = datetime.strptime(start_data['date'], '%Y-%m-%d')
                 end = datetime.strptime(end_data['date'], '%Y-%m-%d')
-                # Make timezone-aware (using local timezone)
-                import pytz
-                local_tz = pytz.timezone('America/Chicago')  # Adjust to your timezone
+                local_tz = pytz.timezone('America/Chicago')
                 start = local_tz.localize(start)
                 end = local_tz.localize(end)
                 all_day = True
