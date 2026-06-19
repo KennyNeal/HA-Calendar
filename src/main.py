@@ -258,7 +258,7 @@ def main():
 
     except KeyboardInterrupt:
         logger.info("Update interrupted by user")
-        sys.exit(0)
+        return None
     except Exception as e:
         logger.error(f"Fatal error during update: {e}", exc_info=True)
         try:
@@ -277,7 +277,7 @@ def main():
             display.sleep()
         except Exception:
             pass
-        sys.exit(1)
+        return None  # Let __main__ decide the exit code; don't kill the retry loop
 
 
 def _acquire_lock(lock_file):
@@ -325,12 +325,15 @@ if __name__ == '__main__':
         finally:
             _release_lock(lock_fd)
 
-        if result is not False:
-            break  # Success or fatal error (sys.exit already called)
+        if result is True:
+            break  # Success
+        if result is None:
+            sys.exit(1)  # Fatal non-network error — don't retry
 
+        # result is False: network down, retry
         retries += 1
         if retries > MAX_RETRIES:
             get_logger().error(f"HA unreachable after {MAX_RETRIES} retries. Giving up.")
-            break
+            sys.exit(1)
         get_logger().info(f"Retrying in {RETRY_INTERVAL // 60} minutes (attempt {retries}/{MAX_RETRIES})...")
         time.sleep(RETRY_INTERVAL)
