@@ -25,7 +25,8 @@ from weather_data import WeatherDataProcessor
 from display.epaper_driver import EPaperDisplay
 from renderer.two_week_renderer import TwoWeekRenderer
 
-RETRY_INTERVAL = 300  # seconds between connectivity retries when HA is unreachable
+RETRY_INTERVAL = 300    # seconds between retries when HA is unreachable
+REFRESH_INTERVAL = 3600  # seconds between normal display updates
 
 
 def load_config():
@@ -325,7 +326,10 @@ if __name__ == '__main__':
             _release_lock(lock_fd)
 
         if result is True:
-            break  # Success
+            attempt = 0  # reset retry counter after a successful update
+            get_logger().info(f"Next update in {REFRESH_INTERVAL // 60} minutes.")
+            time.sleep(REFRESH_INTERVAL)
+            continue
         if result is None:
             sys.exit(1)  # Fatal non-network error — don't retry
 
