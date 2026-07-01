@@ -1,0 +1,17 @@
+[Unit]
+Description=HA-Calendar e-ink display updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/HA-Calendar
+ExecStart=/home/pi/HA-Calendar/venv/bin/python3 /home/pi/HA-Calendar/src/main.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/pi/HA-Calendar/logs/calendar.log
+StandardError=append:/home/pi/HA-Calendar/logs/calendar.log
+
+[Install]
+WantedBy=multi-user.target

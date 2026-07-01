@@ -26,7 +26,6 @@ from display.epaper_driver import EPaperDisplay
 from renderer.two_week_renderer import TwoWeekRenderer
 
 RETRY_INTERVAL = 300  # seconds between connectivity retries when HA is unreachable
-MAX_RETRIES = 12      # give up after 1 hour (12 × 5 min)
 
 
 def load_config():
@@ -311,9 +310,9 @@ def _release_lock(lock_fd):
 
 if __name__ == '__main__':
     lock_file = os.path.join(tempfile.gettempdir(), 'ha-calendar.lock')
-    retries = 0
+    attempt = 0
 
-    while retries <= MAX_RETRIES:
+    while True:
         try:
             lock_fd = _acquire_lock(lock_file)
         except OSError:
@@ -330,10 +329,10 @@ if __name__ == '__main__':
         if result is None:
             sys.exit(1)  # Fatal non-network error — don't retry
 
-        # result is False: network down, retry
-        retries += 1
-        if retries > MAX_RETRIES:
-            get_logger().error(f"HA unreachable after {MAX_RETRIES} retries. Giving up.")
-            sys.exit(1)
-        get_logger().info(f"Retrying in {RETRY_INTERVAL // 60} minutes (attempt {retries}/{MAX_RETRIES})...")
+        # result is False: network down, keep retrying indefinitely
+        attempt += 1
+        get_logger().info(
+            f"HA unreachable — retrying in {RETRY_INTERVAL // 60} minutes "
+            f"(attempt {attempt})..."
+        )
         time.sleep(RETRY_INTERVAL)

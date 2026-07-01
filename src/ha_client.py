@@ -1,8 +1,10 @@
 """Home Assistant API client for fetching calendar and weather data."""
 
+import socket
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 import time
 from utils.logger import get_logger
 
@@ -31,15 +33,18 @@ class HomeAssistantClient:
         }
 
     def is_reachable(self):
-        """Quick connectivity check against the HA API."""
+        """Quick connectivity check via raw TCP connect to avoid DNS caching issues."""
         try:
-            requests.get(
-                f"{self.base_url}/api/",
-                headers=self._get_headers(),
-                timeout=5
-            )
-            return True
-        except requests.exceptions.RequestException:
+            parsed = urlparse(self.base_url)
+            host = parsed.hostname
+            port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+            with socket.create_connection((host, port), timeout=5):
+                return True
+        except socket.gaierror as e:
+            self.logger.debug(f"HA hostname not resolving ({host}): {e}")
+            return False
+        except OSError as e:
+            self.logger.debug(f"HA TCP connection failed ({host}:{port}): {e}")
             return False
 
     def _retry_request(self, method, url, **kwargs):
