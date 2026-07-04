@@ -3,10 +3,12 @@
 
 import json
 import os
+import signal
 import subprocess
 import sys
 import shutil
 import re
+import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from utils.logger import get_logger
@@ -20,6 +22,53 @@ CALENDAR_SCRIPT_PATH = os.environ.get(
     'CALENDAR_SCRIPT_PATH',
     os.path.join(os.path.dirname(__file__), 'main.py')
 )
+
+# main.py runs as a persistent daemon (ha-calendar.service) that refreshes
+# itself hourly. Spawning a second main.py process here would compete with
+# the daemon for the display/GPIO lock, so an on-demand refresh instead
+# signals the daemon to wake up and run a cycle immediately.
+CALENDAR_SERVICE_NAME = os.environ.get('CALENDAR_SERVICE_NAME', 'ha-calendar.service')
+REFRESH_SIGNAL_TIMEOUT = 60  # seconds to wait for the daemon to finish a signaled refresh
+
+
+def _get_daemon_pid():
+    """Look up the PID of the running ha-calendar.service via systemd."""
+    result = subprocess.run(
+        ['systemctl', 'show', CALENDAR_SERVICE_NAME, '--property=MainPID', '--value'],
+        capture_output=True, text=True, timeout=10
+    )
+    pid = int(result.stdout.strip())
+    return pid if pid > 0 else None
+
+
+def trigger_refresh_and_wait(timeout=REFRESH_SIGNAL_TIMEOUT):
+    """
+    Signal the running calendar daemon to refresh immediately and wait for
+    it to complete.
+
+    Returns:
+        tuple: (success: bool, message: str)
+    """
+    pid = _get_daemon_pid()
+    if not pid:
+        return False, 'Calendar daemon (ha-calendar.service) is not running'
+
+    before = load_state() or {}
+    before_updated = before.get('state_updated')
+
+    try:
+        os.kill(pid, signal.SIGUSR1)
+    except ProcessLookupError:
+        return False, f'Calendar daemon process {pid} not found'
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        state = load_state() or {}
+        if state.get('state_updated') and state.get('state_updated') != before_updated:
+            return True, 'Calendar refresh triggered successfully'
+        time.sleep(1)
+
+    return False, 'Timed out waiting for calendar daemon to finish refreshing'
 
 # Get the picture display script path
 PICTURE_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), 'show_pic.py')
@@ -101,40 +150,21 @@ class WebhookHandler(BaseHTTPRequestHandler):
             logger.info("Webhook received: Triggering calendar refresh")
 
             try:
-                # Use venv Python if available, otherwise system Python
-                python_cmd = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
-                
-                # Run the calendar update script (no sudo needed)
-                result = subprocess.run(
-                    [python_cmd, CALENDAR_SCRIPT_PATH],
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                    cwd=DEPLOYMENT_DIR
-                )
+                success, message = trigger_refresh_and_wait()
 
-                if result.returncode == 0:
+                if success:
                     self.send_response(200)
                     self.send_header('Content-type', 'text/plain')
                     self.end_headers()
-                    self.wfile.write(b'Calendar refresh triggered successfully')
+                    self.wfile.write(message.encode())
                     logger.info("Calendar refresh completed successfully")
-                    if result.stdout:
-                        logger.debug(f"Output: {result.stdout}")
                 else:
                     self.send_response(500)
                     self.send_header('Content-type', 'text/plain')
                     self.end_headers()
-                    error_msg = result.stderr or result.stdout or 'Unknown error'
-                    self.wfile.write(f'Error: {error_msg}'.encode())
-                    logger.error(f"Calendar refresh failed (code {result.returncode}): {error_msg}")
+                    self.wfile.write(f'Error: {message}'.encode())
+                    logger.error(f"Calendar refresh failed: {message}")
 
-            except subprocess.TimeoutExpired:
-                self.send_response(500)
-                self.send_header('Content-type', 'text/plain')
-                self.end_headers()
-                self.wfile.write(b'Error: Calendar update timed out')
-                logger.error("Calendar refresh timed out")
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-type', 'text/plain')
