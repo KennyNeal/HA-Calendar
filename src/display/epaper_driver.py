@@ -1,8 +1,26 @@
 """E-paper display driver for Waveshare 7.3" HAT (E)."""
 
 import os
+import signal
 from PIL import Image
 from utils.logger import get_logger
+
+# The Waveshare driver's busy-pin wait loop has no timeout, so if the panel
+# is unplugged or the ribbon cable is loose, epd.init() blocks forever and
+# holds the GPIO chip open, causing every subsequent run to fail with
+# "GPIO busy" until the stuck process is killed. Bound it here instead.
+DISPLAY_INIT_TIMEOUT_SECONDS = 30
+
+
+class DisplayInitTimeout(Exception):
+    """Raised when hardware init doesn't complete within the timeout."""
+
+
+def _raise_timeout(signum, frame):
+    raise DisplayInitTimeout(
+        f"Display did not respond within {DISPLAY_INIT_TIMEOUT_SECONDS}s "
+        "(is it plugged in?)"
+    )
 
 
 class EPaperDisplay:
@@ -60,14 +78,32 @@ class EPaperDisplay:
 
             self.logger.info("Initializing Waveshare 7.3\" e-Paper display...")
             self.epd = epd7in3e.EPD()
-            self.epd.init()
+
+            previous_handler = signal.signal(signal.SIGALRM, _raise_timeout)
+            signal.alarm(DISPLAY_INIT_TIMEOUT_SECONDS)
+            try:
+                self.epd.init()
+            finally:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, previous_handler)
+
             self.logger.info("Display initialized successfully")
         except ImportError as e:
             self.logger.error(f"Failed to import Waveshare library: {e}")
             self.logger.warning("Falling back to mock mode")
             self.mock_mode = True
+        except DisplayInitTimeout as e:
+            self.logger.error(str(e))
+            self.logger.warning("Falling back to mock mode")
+            self.mock_mode = True
         except Exception as e:
             self.logger.error(f"Failed to initialize display: {e}")
+            if 'GPIO busy' in str(e):
+                self.logger.error(
+                    "GPIO is held by another process. Check for a leftover "
+                    "main.py still running (e.g. `pgrep -fa src/main.py`) "
+                    "and kill it, then retry."
+                )
             self.logger.warning("Falling back to mock mode")
             self.mock_mode = True
 
