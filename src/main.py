@@ -355,6 +355,10 @@ if __name__ == '__main__':
     lock_file = os.path.join(tempfile.gettempdir(), 'ha-calendar.lock')
     attempt = 0
 
+    # In mock mode (development) run a single update and exit instead of
+    # looping like the on-device daemon.
+    mock_mode = load_config().get('display', {}).get('mock_mode', False)
+
     while True:
         try:
             lock_fd = _acquire_lock(lock_file)
@@ -367,6 +371,10 @@ if __name__ == '__main__':
             result = main()
         finally:
             _release_lock(lock_fd)
+
+        if mock_mode:
+            get_logger().info("Mock mode: exiting after a single update.")
+            sys.exit(0 if result is True else 1)
 
         if result is True:
             attempt = 0  # reset retry counter after a successful update
