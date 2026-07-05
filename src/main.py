@@ -315,14 +315,42 @@ def _release_lock(lock_fd):
 # refresh instead of waiting out the rest of the current sleep interval.
 _wake_event = threading.Event()
 
+# Set by SIGUSR2 (sent by webhook_server.py's /pics easter egg) to show a
+# random picture before the next refresh, using the daemon's own display
+# ownership rather than spawning a competing process.
+_show_picture_event = threading.Event()
+
 
 def _handle_wake_signal(signum, frame):
     _wake_event.set()
 
 
+def _handle_show_picture_signal(signum, frame):
+    _show_picture_event.set()
+    _wake_event.set()
+
+
+def _show_picture_if_requested(config):
+    if not _show_picture_event.is_set():
+        return
+    _show_picture_event.clear()
+
+    from show_pic import show_random_picture
+
+    logger = get_logger()
+    try:
+        display = EPaperDisplay(config)
+        display.init_display()
+        show_random_picture(config, display)
+    except Exception as e:
+        logger.error(f"Failed to display picture: {e}", exc_info=True)
+
+
 if __name__ == '__main__':
     if hasattr(signal, 'SIGUSR1'):
         signal.signal(signal.SIGUSR1, _handle_wake_signal)
+    if hasattr(signal, 'SIGUSR2'):
+        signal.signal(signal.SIGUSR2, _handle_show_picture_signal)
 
     lock_file = os.path.join(tempfile.gettempdir(), 'ha-calendar.lock')
     attempt = 0
@@ -335,6 +363,7 @@ if __name__ == '__main__':
             sys.exit(0)
 
         try:
+            _show_picture_if_requested(load_config())
             result = main()
         finally:
             _release_lock(lock_fd)

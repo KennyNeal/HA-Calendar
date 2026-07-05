@@ -5,7 +5,6 @@ import json
 import os
 import signal
 import subprocess
-import sys
 import shutil
 import re
 import time
@@ -16,12 +15,6 @@ from utils.state_manager import load_state
 import yaml
 
 logger = get_logger()
-
-# Get the calendar script path from environment variable
-CALENDAR_SCRIPT_PATH = os.environ.get(
-    'CALENDAR_SCRIPT_PATH',
-    os.path.join(os.path.dirname(__file__), 'main.py')
-)
 
 # main.py runs as a persistent daemon (ha-calendar.service) that refreshes
 # itself hourly. Spawning a second main.py process here would compete with
@@ -70,17 +63,11 @@ def trigger_refresh_and_wait(timeout=REFRESH_SIGNAL_TIMEOUT):
 
     return False, 'Timed out waiting for calendar daemon to finish refreshing'
 
-# Get the picture display script path
-PICTURE_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), 'show_pic.py')
-
 # Get deployment directory
 DEPLOYMENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(DEPLOYMENT_DIR, 'config', 'config.yaml')
 DISPLAY_PATH = os.path.join(DEPLOYMENT_DIR, 'calendar_display.png')
 IMG_DIR = os.path.join(DEPLOYMENT_DIR, 'img')
-
-# Get venv python path
-VENV_PYTHON = os.path.join(DEPLOYMENT_DIR, 'venv', 'bin', 'python3')
 
 
 def get_config():
@@ -176,57 +163,19 @@ class WebhookHandler(BaseHTTPRequestHandler):
             logger.info("Easter egg triggered: Displaying random picture")
 
             try:
-                # Use venv Python if available, otherwise system Python
-                python_cmd = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
-                
-                # Start picture display and calendar refresh in background
-                # This prevents timeout issues
-                import threading
-                
-                def display_and_refresh():
-                    """Display picture, wait, then refresh calendar."""
-                    try:
-                        # Display the picture (includes 15 second wait)
-                        result = subprocess.run(
-                            [python_cmd, PICTURE_SCRIPT_PATH],
-                            capture_output=True,
-                            text=True,
-                            timeout=60,  # Increase timeout for slow e-paper refresh
-                            cwd=DEPLOYMENT_DIR
-                        )
-                        
-                        if result.returncode == 0:
-                            logger.info("Picture display completed successfully")
-                        else:
-                            logger.error(f"Picture display failed: {result.stderr}")
-                        
-                        # Now refresh the calendar
-                        logger.info("Restoring calendar display...")
-                        refresh_result = subprocess.run(
-                            [python_cmd, CALENDAR_SCRIPT_PATH],
-                            capture_output=True,
-                            text=True,
-                            timeout=120,
-                            cwd=DEPLOYMENT_DIR
-                        )
-                        
-                        if refresh_result.returncode == 0:
-                            logger.info("Calendar restored successfully")
-                        else:
-                            logger.warning(f"Calendar restore had issues: {refresh_result.stderr}")
-                    except Exception as e:
-                        logger.error(f"Error in display_and_refresh: {e}")
-                
-                # Start the background thread
-                thread = threading.Thread(target=display_and_refresh, daemon=True)
-                thread.start()
-                
-                # Respond immediately
+                # Signal the daemon to show a picture itself (it owns the
+                # display/GPIO) rather than spawning a competing process.
+                pid = _get_daemon_pid()
+                if not pid:
+                    raise RuntimeError(f'Calendar daemon ({CALENDAR_SERVICE_NAME}) is not running')
+
+                os.kill(pid, signal.SIGUSR2)
+
                 self.send_response(202)  # 202 Accepted
                 self.send_header('Content-type', 'text/plain')
                 self.end_headers()
                 self.wfile.write(b'Picture display started! Will show for 15 seconds then restore calendar.')
-                logger.info("Picture display started in background")
+                logger.info("Picture display signal sent to daemon")
 
             except Exception as e:
                 self.send_response(500)

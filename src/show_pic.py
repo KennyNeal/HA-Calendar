@@ -50,76 +50,89 @@ def get_random_image():
     return random.choice(image_files)
 
 
+def render_picture_image(config, image_path):
+    """Load an image file and crop/resize it to fit the display dimensions."""
+    display_config = config['display']
+    width = display_config['width']
+    height = display_config['height']
+
+    image = Image.open(image_path)
+
+    # Resize maintaining aspect ratio, then crop to fit
+    img_ratio = image.width / image.height
+    display_ratio = width / height
+
+    if img_ratio > display_ratio:
+        # Image is wider - fit to height and crop width
+        new_height = height
+        new_width = int(height * img_ratio)
+    else:
+        # Image is taller - fit to width and crop height
+        new_width = width
+        new_height = int(width / img_ratio)
+
+    image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+    # Crop to center
+    left = (new_width - width) // 2
+    top = (new_height - height) // 2
+    image = image.crop((left, top, left + width, top + height))
+
+    if image.mode != 'RGB':
+        image = image.convert('RGB')
+
+    return image
+
+
+def show_random_picture(config, display, duration=15):
+    """
+    Display a random picture on an already-initialized EPaperDisplay for
+    `duration` seconds. Used by the daemon (main.py) so it can show the
+    picture using its own display/GPIO ownership instead of a separate
+    process.
+
+    Returns:
+        bool: True if a picture was found and displayed, False otherwise.
+    """
+    logger = get_logger()
+
+    image_path = get_random_image()
+    if not image_path:
+        logger.error("No images found in img/ folder")
+        return False
+
+    logger.info(f"Selected image: {image_path.name}")
+    image = render_picture_image(config, image_path)
+
+    logger.info("Displaying image...")
+    display.display_image(image)
+
+    logger.info(f"Displaying for {duration} seconds...")
+    time.sleep(duration)
+
+    return True
+
+
 def display_picture():
-    """Display a random picture for 15 seconds."""
-    # Load configuration
+    """Standalone entry point: display a random picture for 15 seconds."""
     config = load_config()
-    
-    # Setup logging
     logger = setup_logger(config)
     logger.info("="* 60)
     logger.info("HA-Calendar Easter Egg: Random Picture Display")
     logger.info("="* 60)
-    
+
     try:
-        # Get a random image
-        image_path = get_random_image()
-        
-        if not image_path:
-            logger.error("No images found in img/ folder")
-            return
-        
-        logger.info(f"Selected image: {image_path.name}")
-        
-        # Load and resize image to display dimensions
-        display_config = config['display']
-        width = display_config['width']
-        height = display_config['height']
-        
-        logger.info(f"Loading image and resizing to {width}x{height}...")
-        image = Image.open(image_path)
-        
-        # Resize maintaining aspect ratio, then crop to fit
-        img_ratio = image.width / image.height
-        display_ratio = width / height
-        
-        if img_ratio > display_ratio:
-            # Image is wider - fit to height and crop width
-            new_height = height
-            new_width = int(height * img_ratio)
-        else:
-            # Image is taller - fit to width and crop height
-            new_width = width
-            new_height = int(width / img_ratio)
-        
-        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        
-        # Crop to center
-        left = (new_width - width) // 2
-        top = (new_height - height) // 2
-        image = image.crop((left, top, left + width, top + height))
-        
-        # Convert to RGB if needed
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        # Initialize display
         display = EPaperDisplay(config)
         logger.info("Initializing display...")
         display.init_display()
-        
-        # Display the image
-        logger.info("Displaying image...")
-        display.display_image(image)
-        
-        # Wait 15 seconds
-        logger.info("Displaying for 15 seconds...")
-        time.sleep(15)
-        
+
+        if not show_random_picture(config, display):
+            return
+
         # Don't put display to sleep - it will be refreshed by the next calendar update
         logger.info("Picture display complete")
         logger.info("="* 60)
-        
+
     except Exception as e:
         logger.error(f"Error displaying picture: {e}", exc_info=True)
         sys.exit(1)
