@@ -37,6 +37,25 @@ class BaseRenderer:
         # Load fonts
         self.fonts = self._load_fonts()
 
+        # Holiday lookup for day headers (optional; degrades gracefully if
+        # the holidays package is not installed)
+        holidays_config = config.get('holidays') or {}
+        try:
+            import holidays as holidays_lib
+            self.holidays = holidays_lib.country_holidays(
+                holidays_config.get('country', 'US'),
+                subdiv=holidays_config.get('subdiv')
+            )
+        except Exception as e:
+            self.logger.warning(f"Holiday lookup unavailable: {e}")
+            self.holidays = None
+
+    def get_holiday_name(self, date_obj):
+        """Return the holiday name for a date, or None."""
+        if self.holidays is None:
+            return None
+        return self.holidays.get(date_obj)
+
     def _load_fonts(self):
         """
         Load fonts for rendering.
@@ -547,7 +566,7 @@ class BaseRenderer:
         dot_size = 12
         dot_text_gap = 5
         item_gap = 18
-        legend_items = list(calendar_legend.items())[:3]
+        legend_items = list(calendar_legend.items())[:4]
 
         # Measure total legend width
         total_legend_width = 0

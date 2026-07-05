@@ -21,6 +21,13 @@ calendars:
   #   display_name: "Holidays"
   #   color: "blue"
 
+# Holidays shown inline in day headers (agenda view)
+# Uses the python-holidays package; see https://pypi.org/project/holidays/
+# for supported country and subdivision codes.
+holidays:
+  country: "US"
+  subdiv: null  # optional state/province code, e.g. "LA"
+
 # Weather entity
 weather:
   entity_id: "weather.forecast_home"
