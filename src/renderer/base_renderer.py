@@ -547,7 +547,7 @@ class BaseRenderer:
         dot_size = 12
         dot_text_gap = 5
         item_gap = 18
-        legend_items = list(calendar_legend.items())[:3]
+        legend_items = list(calendar_legend.items())[:4]
 
         # Measure total legend width
         total_legend_width = 0

@@ -78,6 +78,14 @@ class AgendaRenderer(BaseRenderer):
         padding = 20
         max_width = left_width - (2 * padding)
 
+        # Fixed-width time column so event titles align vertically
+        indicator_size = 10
+        indicator_x = padding + 10
+        time_col_x = indicator_x + indicator_size + 10
+        time_bbox = draw.textbbox((0, 0), "12:30 PM", font=self.fonts['medium'])
+        time_col_width = (time_bbox[2] - time_bbox[0]) + 12
+        title_x = time_col_x + time_col_width
+
         for event_date in sorted_dates:
             # Get day events if exists, otherwise create empty one for today
             if event_date in events_by_day:
@@ -88,68 +96,42 @@ class AgendaRenderer(BaseRenderer):
                 day_events = SimpleNamespace(
                     date=event_date,
                     events=[],
-                    is_today=(event_date == date.today())
+                    is_today=(event_date == today)
                 )
 
-            if not day_events.events:
-                # For today, we still want to show the header with "No events"
-                if not day_events.is_today:
-                    continue  # Skip days with no events (except today)
-                events_to_show = []
-            else:
-                # Filter past events for today
-                events_to_show = []
-                for event in day_events.events:
-                    # If today, skip events that have already passed
-                    if day_events.is_today and not event.all_day:
-                        # Handle both timezone-aware and timezone-naive datetimes
-                        current_time = datetime.now(event.start.tzinfo) if event.start.tzinfo else datetime.now()
-                        if event.start < current_time:
-                            continue
-                    events_to_show.append(event)
+            # Keep today's events until they END, so in-progress events stay visible
+            now = None
+            events_to_show = []
+            for event in day_events.events:
+                if day_events.is_today and not event.all_day:
+                    # Handle both timezone-aware and timezone-naive datetimes
+                    now = datetime.now(event.start.tzinfo) if event.start.tzinfo else datetime.now()
+                    if event.end < now:
+                        continue
+                events_to_show.append(event)
 
             # For today, always show the date header even if no events
             if not events_to_show and not day_events.is_today:
                 continue  # Skip if no events to show (except for today)
 
-            # Check if this is today or tomorrow
-            is_tomorrow = event_date == date.today() + timedelta(days=1)
-            
-            # For days other than today/tomorrow, check if we can show all events
-            if not day_events.is_today and not is_tomorrow:
-                # Calculate space needed for this day
-                text_x = padding + 10 + 10 + 10  # padding + indicator position + indicator size + gap
-                space_needed = line_height + 5  # date header with underline
-                
-                for event in events_to_show:
-                    if event.all_day:
-                        event_text = f"{event.title} (All Day)"
-                    else:
-                        time_str = event.start.strftime("%I:%M %p")
-                        event_text = f"{time_str} - {event.title}"
-                    
-                    text_lines = self.wrap_text(
-                        event_text,
-                        max_width - (text_x - padding),
-                        self.fonts['medium'],
-                        draw,
-                        max_lines=2
-                    )
-                    space_needed += line_height * len(text_lines)
-                
-                space_needed += 6  # spacing between days
-                
-                # Skip this day if we can't show all events
-                if content_y + space_needed > content_bottom:
-                    continue
+            # Stop once there is no room for a date header plus one event line,
+            # so the list is always contiguous (no silently skipped days)
+            if content_y + (line_height + 5) + line_height > content_bottom:
+                break
 
-            # Draw date header
+            is_tomorrow = event_date == today + timedelta(days=1)
+
+            # Draw date header (day number without leading zero)
+            day_name = f"{event_date.strftime('%A, %B')} {event_date.day}"
             if day_events.is_today:
-                date_str = f"TODAY - {event_date.strftime('%A, %B %d')}"
-            elif event_date == date.today() + timedelta(days=1):
-                date_str = f"TOMORROW - {event_date.strftime('%A, %B %d')}"
+                date_str = f"TODAY - {day_name}"
+                header_color = self.red
+            elif is_tomorrow:
+                date_str = f"TOMORROW - {day_name}"
+                header_color = self.blue
             else:
-                date_str = event_date.strftime("%A, %B %d")
+                date_str = day_name
+                header_color = self.black
 
             self.draw_text(
                 draw,
@@ -157,7 +139,7 @@ class AgendaRenderer(BaseRenderer):
                 padding,
                 content_y,
                 self.fonts['large'],
-                self.black
+                header_color
             )
 
             # Draw underline for date
@@ -165,7 +147,7 @@ class AgendaRenderer(BaseRenderer):
             date_width = date_bbox[2] - date_bbox[0]
             draw.line(
                 [(padding, content_y + 24), (padding + date_width, content_y + 24)],
-                fill=self.black,
+                fill=header_color,
                 width=1
             )
 
@@ -177,22 +159,58 @@ class AgendaRenderer(BaseRenderer):
                 self.draw_text(
                     draw,
                     "No events scheduled",
-                    padding + 10,
+                    time_col_x,
                     content_y,
                     self.fonts['medium'],
                     self.black
                 )
                 content_y += line_height
-            
-            for event in events_to_show:
-                if content_y + line_height > content_bottom:
-                    break  # No more space
 
-                # Draw colored indicator
-                indicator_size = 10
-                indicator_x = padding + 10
-                indicator_y = content_y + 4
+            for i, event in enumerate(events_to_show):
+                # Track calendar for legend
+                if event.calendar_name and event.calendar_name not in calendar_legend:
+                    calendar_legend[event.calendar_name] = event.color
+
+                # Time column text; in-progress events show "Now"
+                in_progress = (
+                    not event.all_day and now is not None
+                    and event.start <= now < event.end
+                )
+                if event.all_day:
+                    time_text = "All Day"
+                elif in_progress:
+                    time_text = "Now"
+                else:
+                    time_text = event.start.strftime("%I:%M %p").lstrip("0")
+
+                # Wrap title only, so continuation lines stay aligned to the title column
+                text_lines = self.wrap_text(
+                    event.title,
+                    max_width - (title_x - padding),
+                    self.fonts['medium'],
+                    draw,
+                    max_lines=2
+                )
+
+                required_height = line_height * len(text_lines)
+                # Reserve room for a "+N more" marker unless this is the last event
+                is_last = (i == len(events_to_show) - 1)
+                reserve = 0 if is_last else 16
+                if content_y + required_height + reserve > content_bottom:
+                    remaining = len(events_to_show) - i
+                    self.draw_text(
+                        draw,
+                        f"+{remaining} more",
+                        time_col_x,
+                        min(content_y, content_bottom - 16),
+                        self.fonts['small'],
+                        self.black
+                    )
+                    content_y = content_bottom
+                    break
+
                 # Draw colored indicator with black border for light colors
+                indicator_y = content_y + 4
                 outline_color = self.black if self.is_light_color(event.color) else None
                 outline_width = 2 if outline_color else 1
                 self.draw_box(
@@ -206,46 +224,23 @@ class AgendaRenderer(BaseRenderer):
                     outline_width=outline_width
                 )
 
-                # Format event text
-                text_x = indicator_x + indicator_size + 10
-
-                # Track calendar for legend
-                if event.calendar_name and event.calendar_name not in calendar_legend:
-                    calendar_legend[event.calendar_name] = event.color
-
-                if event.all_day:
-                    event_text = f"{event.title} (All Day)"
-                else:
-                    time_str = event.start.strftime("%I:%M %p")
-                    event_text = f"{time_str} - {event.title}"
-
-                # Draw wrapped event text
-                text_lines = self.wrap_text(
-                    event_text,
-                    max_width - (text_x - padding),
-                    self.fonts['medium'],
+                # Right-align the time within its column; "Now" pops in red
+                time_color = self.red if in_progress else self.black
+                self.draw_text(
                     draw,
-                    max_lines=2
+                    time_text,
+                    title_x - 8,
+                    content_y,
+                    self.fonts['medium'],
+                    time_color,
+                    align='right'
                 )
-
-                required_height = line_height * len(text_lines)
-                if content_y + required_height > content_bottom:
-                    self.draw_text(
-                        draw,
-                        "... (more events not shown)",
-                        padding,
-                        content_y,
-                        self.fonts['medium'],
-                        self.black
-                    )
-                    content_y = content_bottom
-                    break
 
                 for line in text_lines:
                     self.draw_text(
                         draw,
                         line,
-                        text_x,
+                        title_x,
                         content_y,
                         self.fonts['medium'],
                         self.black
@@ -305,10 +300,7 @@ class AgendaRenderer(BaseRenderer):
                 align='center',
                 max_width=right_width - 24
             )
-            
-            # Initialize wind flag
-            wind_on_same_line = False
-            
+
             # Draw today's high and low temperatures with weather icons on the left
             today = date.today()
             high_low_y = condition_y + 32  # Below condition text
@@ -351,7 +343,9 @@ class AgendaRenderer(BaseRenderer):
                         temp_width = temp_bbox[2] - temp_bbox[0]
                         humidity_icon_bbox = draw.textbbox((0, 0), humidity_icon, font=weather_icon_font)
                         humidity_icon_width = humidity_icon_bbox[2] - humidity_icon_bbox[0]
-                        
+                        humidity_text_bbox = draw.textbbox((0, 0), humidity_text, font=temp_font)
+                        humidity_text_width = humidity_text_bbox[2] - humidity_text_bbox[0]
+
                         # Layout: wind (left) + gap + thermo+temp+humidity (right)
                         # Draw wind on left
                         wind_x = right_x + 12
@@ -359,7 +353,7 @@ class AgendaRenderer(BaseRenderer):
                         self.draw_text(draw, wind_speed_text, wind_x + wind_icon_width + gap_between, high_low_y, temp_font, self.black)
                         
                         # Draw temp/humidity on right side
-                        thermo_humidity_width = thermo_width + gap_between + temp_width + gap_between + humidity_icon_width + gap_between + len(humidity_text) * 8
+                        thermo_humidity_width = thermo_width + gap_between + temp_width + gap_between + humidity_icon_width + gap_between + humidity_text_width
                         thermo_x = right_x + right_width - thermo_humidity_width - 12
                         
                         # Draw thermometer icon
@@ -378,8 +372,6 @@ class AgendaRenderer(BaseRenderer):
                         # Draw humidity percentage in black
                         x_pos += humidity_icon_width + gap_between
                         self.draw_text(draw, humidity_text, x_pos, high_low_y, temp_font, self.black)
-                        
-                        wind_on_same_line = True
 
             # Draw AI weather summary between current conditions and forecast
             if weather_summary:
@@ -412,7 +404,6 @@ class AgendaRenderer(BaseRenderer):
             weather_y += 40
             footer_y = self.height - footer_height
             forecast_y = weather_y + 16
-            forecast_row2_y = forecast_y + 88
 
         # 4-day forecast (tomorrow + next 3 days) in a single row
         forecast_item_width = right_width // 4
