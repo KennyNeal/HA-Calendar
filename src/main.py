@@ -2,6 +2,8 @@
 
 import sys
 import os
+import signal
+import threading
 import time
 import yaml
 import tempfile
@@ -309,7 +311,19 @@ def _release_lock(lock_fd):
         lock_fd.close()
 
 
+# Woken by SIGUSR1 (sent by webhook_server.py) to trigger an immediate
+# refresh instead of waiting out the rest of the current sleep interval.
+_wake_event = threading.Event()
+
+
+def _handle_wake_signal(signum, frame):
+    _wake_event.set()
+
+
 if __name__ == '__main__':
+    if hasattr(signal, 'SIGUSR1'):
+        signal.signal(signal.SIGUSR1, _handle_wake_signal)
+
     lock_file = os.path.join(tempfile.gettempdir(), 'ha-calendar.lock')
     attempt = 0
 
@@ -328,7 +342,8 @@ if __name__ == '__main__':
         if result is True:
             attempt = 0  # reset retry counter after a successful update
             get_logger().info(f"Next update in {REFRESH_INTERVAL // 60} minutes.")
-            time.sleep(REFRESH_INTERVAL)
+            _wake_event.clear()
+            _wake_event.wait(timeout=REFRESH_INTERVAL)
             continue
         if result is None:
             sys.exit(1)  # Fatal non-network error — don't retry
@@ -339,4 +354,5 @@ if __name__ == '__main__':
             f"HA unreachable — retrying in {RETRY_INTERVAL // 60} minutes "
             f"(attempt {attempt})..."
         )
-        time.sleep(RETRY_INTERVAL)
+        _wake_event.clear()
+        _wake_event.wait(timeout=RETRY_INTERVAL)
