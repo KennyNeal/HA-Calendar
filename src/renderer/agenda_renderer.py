@@ -133,6 +133,12 @@ class AgendaRenderer(BaseRenderer):
                 date_str = day_name
                 header_color = self.black
 
+            # Show holidays inline, e.g. "TODAY - Saturday, July 4 - Independence Day"
+            holiday_name = self.get_holiday_name(event_date)
+            if holiday_name:
+                date_str = f"{date_str} - {holiday_name}"
+            date_str = self.truncate_text(date_str, max_width, self.fonts['large'], draw)
+
             self.draw_text(
                 draw,
                 date_str,
