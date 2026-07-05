@@ -373,13 +373,17 @@ class AgendaRenderer(BaseRenderer):
                         x_pos += humidity_icon_width + gap_between
                         self.draw_text(draw, humidity_text, x_pos, high_low_y, temp_font, self.black)
 
-            # Draw AI weather summary between current conditions and forecast
+            # Draw AI weather summary between current conditions and forecast,
+            # using as many lines as fit in the space above the forecast row
             if weather_summary:
-                summary_y = high_low_y + 32
+                summary_y = high_low_y + 44
                 summary_font = self.fonts['normal']
                 summary_max_width = right_width - 24
-                lines = self.wrap_text(weather_summary, summary_max_width, summary_font, draw, max_lines=3)
-                line_height = 20
+                summary_line_height = 20
+                forecast_top = self.height - footer_height - 95
+                available_lines = max(1, (forecast_top - summary_y - 8) // summary_line_height)
+                lines = self.wrap_text(weather_summary, summary_max_width, summary_font, draw, max_lines=available_lines)
+                line_height = summary_line_height
                 for i, line in enumerate(lines):
                     self.draw_text(
                         draw, line,
