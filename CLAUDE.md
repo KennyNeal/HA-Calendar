@@ -13,7 +13,12 @@ A Python app that drives a Waveshare 7.3" 6-color e-Paper display (connected to 
 chmod +x install.sh && ./install.sh   # installs system deps, venv, Waveshare library
 ./setup-cron.sh                        # installs hourly cron job
 ./setup-webhook.sh                     # installs webhook service
+./setup-network-watchdog.sh            # auto-reboots the Pi if WiFi wedges (see below)
 ```
+
+### Network watchdog
+
+The Pi's WiFi chip can occasionally wedge at the driver level after the AP drops/reconnects — the interface stays "up" but stops passing traffic (even SSH), and only a full reboot recovers it. `setup-network-watchdog.sh` installs a cron job (`scripts/network-watchdog.sh`) that pings the default gateway every 2 minutes and reboots the Pi after 5 consecutive failures (~10 min of no network). It also enables persistent journald storage so `journalctl -k -b -1` can be used after such a reboot to inspect what the kernel logged right before the hang. This is a mitigation for an OS/driver-level issue, not a bug in this app's Python code.
 
 ### Windows development (mock mode)
 ```powershell
