@@ -19,12 +19,9 @@ log() {
     echo "$(date -Iseconds) $1" >> "$LOG_FILE"
 }
 
-if [ -z "$GATEWAY" ]; then
-    log "No default gateway found in routing table; skipping check."
-    exit 0
-fi
-
-if ping -c 1 -W 5 "$GATEWAY" >/dev/null 2>&1; then
+# A missing default route counts as a failure: when the WiFi wedges, the
+# route is often dropped entirely, so skipping here would mean never rebooting.
+if [ -n "$GATEWAY" ] && ping -c 1 -W 5 "$GATEWAY" >/dev/null 2>&1; then
     if [ -f "$STATE_FILE" ]; then
         rm -f "$STATE_FILE"
         log "Gateway $GATEWAY reachable again; watchdog reset."
@@ -36,7 +33,11 @@ count=0
 [ -f "$STATE_FILE" ] && count="$(cat "$STATE_FILE")"
 count=$((count + 1))
 echo "$count" > "$STATE_FILE"
-log "Gateway $GATEWAY unreachable (failure $count/$FAIL_THRESHOLD)."
+if [ -z "$GATEWAY" ]; then
+    log "No default gateway in routing table (failure $count/$FAIL_THRESHOLD)."
+else
+    log "Gateway $GATEWAY unreachable (failure $count/$FAIL_THRESHOLD)."
+fi
 
 if [ "$count" -ge "$FAIL_THRESHOLD" ]; then
     log "Failure threshold reached; rebooting."

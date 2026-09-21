@@ -33,12 +33,17 @@ fi
 
 # Enable persistent journald storage so kernel logs survive a reboot,
 # letting us inspect `journalctl -k -b -1` after a watchdog-triggered reboot.
-sudo mkdir -p /var/log/journal
+# Raspberry Pi OS ships /usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf
+# (Storage=volatile), which overrides journald.conf itself, so use a drop-in
+# that sorts after it instead of editing journald.conf.
+JOURNALD_DROPIN="/etc/systemd/journald.conf.d/99-ha-calendar-persistent.conf"
+sudo mkdir -p /var/log/journal /etc/systemd/journald.conf.d
 sudo systemd-tmpfiles --create --prefix /var/log/journal
-if [ -f /etc/systemd/journald.conf ] && ! grep -q '^Storage=persistent' /etc/systemd/journald.conf; then
-    sudo sed -i 's/^#\?Storage=.*/Storage=persistent/' /etc/systemd/journald.conf
+if ! grep -qs '^Storage=persistent' "$JOURNALD_DROPIN"; then
+    printf '[Journal]\nStorage=persistent\n' | sudo tee "$JOURNALD_DROPIN" >/dev/null
     sudo systemctl restart systemd-journald
-    echo "✓ Persistent journald logging enabled"
+    sudo journalctl --flush
+    echo "✓ Persistent journald logging enabled ($JOURNALD_DROPIN)"
 else
     echo "✓ Persistent journald logging already enabled"
 fi
